@@ -9,13 +9,25 @@ import Typography from "@mui/material/Typography";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import AdminSheduleReportPage from "./pages/AdminSheduleReportPage";
 import CampusNavigationPage from "./pages/CampusNavigationPage";
+import MapConfigurePage from "./pages/MapConfigurePage";
+import MapPage from "./pages/MapPage";
 import ScheduleImportPage from "./pages/ScheduleImportPage";
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const currentTab =
-    location.pathname.startsWith("/schedule") ? "/schedule" : "/navigation";
+
+  let currentTab = false;
+
+  if (location.pathname.startsWith("/map-configure")) {
+    currentTab = false;
+  } else if (location.pathname.startsWith("/map")) {
+    currentTab = "/map";
+  } else if (location.pathname.startsWith("/navigation")) {
+    currentTab = "/navigation";
+  } else if (location.pathname.startsWith("/schedule")) {
+    currentTab = "/schedule";
+  }
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
@@ -46,8 +58,9 @@ function App() {
               ".MuiTabs-indicator": { height: 3 },
             }}
           >
-            <Tab value="/navigation" label="Навигация по вузу" />
-            <Tab value="/schedule" label="Импорт расписания" />
+            <Tab value="/navigation" label="Навигация" />
+            <Tab value="/map" label="Карта" />
+            <Tab value="/schedule" label="Расписание" />
           </Tabs>
         </Toolbar>
       </AppBar>
@@ -57,6 +70,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/navigation" replace />} />
           <Route path="/navigation" element={<CampusNavigationPage />} />
+          <Route path="/map" element={<MapPage />} />
+          <Route path="/map-configure" element={<MapConfigurePage />} />
           <Route path="/schedule" element={<ScheduleImportPage />} />
           <Route path="/admin/shedule/report" element={<AdminSheduleReportPage />} />
         </Routes>
