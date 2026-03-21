@@ -323,10 +323,6 @@ function MapPage() {
                           <Chip label={`От: ${routeFromPlace?.name ?? routeFromPlaceId}`} size="small" />
                           <Chip label={`До: ${routeToPlace?.name ?? routeToPlaceId}`} size="small" />
                         </Stack>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                          <Chip label={`Расстояние: ${route.distanceMeters} м`} size="small" color="primary" variant="outlined" />
-                          <Chip label={`Время: ${route.estimatedDurationMinutes} мин`} size="small" color="primary" variant="outlined" />
-                        </Stack>
                         {route.steps.length > 0 ? (
                           <List sx={{ p: 0 }}>
                             {route.steps.map((step) => (
