@@ -14,7 +14,10 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { useEffect, useMemo, useState } from "react";
-import { fetchGroupSchedule, fetchScheduleGroups } from "../api/scheduleApi";
+import {
+  fetchGroupSchedule,
+  fetchScheduleGroups,
+} from "../api/scheduleApi";
 
 const dayNames = {
   1: "Пн",
@@ -26,6 +29,11 @@ const dayNames = {
   7: "Вс",
 };
 
+function getTodayScheduleDay() {
+  const jsDay = new Date().getDay();
+  return jsDay === 0 ? 7 : jsDay;
+}
+
 function ScheduleImportPage() {
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState("");
@@ -34,21 +42,20 @@ function ScheduleImportPage() {
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [error, setError] = useState("");
+  const todayScheduleDay = getTodayScheduleDay();
+  const todayName = dayNames[todayScheduleDay] ?? "Сегодня";
 
   const rows = useMemo(() => {
     return [...events]
+      .filter((event) => event.day === todayScheduleDay)
       .sort((a, b) => {
-        if (a.day !== b.day) {
-          return a.day - b.day;
-        }
         if (a.startTimeHourNum !== b.startTimeHourNum) {
           return a.startTimeHourNum - b.startTimeHourNum;
         }
         return a.startTimeMinNum - b.startTimeMinNum;
       })
       .map((event, index) => ({
-        id: `${event.day}-${event.time}-${event.discipline?.abbr ?? index}`,
-        day: dayNames[event.day] ?? `${event.day}`,
+        id: `${event.day}-${event.time}-${event.discipline?.abbr ?? index}-${index}`,
         time: `${event.startTime} - ${event.endTime}`,
         title:
           event.discipline?.fullName ??
@@ -56,7 +63,7 @@ function ScheduleImportPage() {
           "Без названия дисциплины",
         room: event.audiences?.[0]?.name ?? "Не указана",
       }));
-  }, [events]);
+  }, [events, todayScheduleDay]);
 
   const loadGroups = async () => {
     setLoadingGroups(true);
@@ -88,35 +95,23 @@ function ScheduleImportPage() {
 
       walk(root);
       setGroups(collected);
-
-      if (collected.length > 0) {
-        setSelectedGroupId((prev) => prev || collected[0].id);
-        return selectedGroupId || collected[0].id;
-      }
-
-      setSelectedGroupId("");
-      return "";
+      return collected;
     } catch (err) {
       setError(err.message || "Не удалось загрузить список групп");
-      return "";
+      return [];
     } finally {
       setLoadingGroups(false);
     }
   };
 
-  const handleSync = async () => {
-    await loadGroups();
-  };
-
   const handleShowSchedule = async () => {
-    let groupIdToLoad = selectedGroupId;
-
-    if (!groupIdToLoad) {
-      groupIdToLoad = await loadGroups();
-    }
-
-    if (!groupIdToLoad) {
-      setError("Сначала синхронизируйте и выберите группу");
+    if (!selectedGroupId) {
+      const loadedGroups = await loadGroups();
+      if (loadedGroups.length > 0) {
+        setError("Выберите группу и повторите попытку.");
+      } else {
+        setError("Список групп недоступен. Повторите попытку позже.");
+      }
       return;
     }
 
@@ -124,11 +119,11 @@ function ScheduleImportPage() {
     setError("");
 
     try {
-      const response = await fetchGroupSchedule(groupIdToLoad);
+      const response = await fetchGroupSchedule(selectedGroupId);
       setEvents(response?.data?.schedule ?? []);
       setScheduleLoaded(true);
     } catch (err) {
-      setError(err.message || "Не удалось загрузить расписание");
+      setError(err?.message || "Не удалось загрузить расписание");
       setEvents([]);
       setScheduleLoaded(false);
     } finally {
@@ -165,18 +160,9 @@ function ScheduleImportPage() {
                 </Typography>
                 <Divider sx={{ mb: 1.5 }} />
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Синхронизируйте список групп и загрузите расписание выбранной
-                  группы.
+                  Выберите группу и загрузите ее расписание.
                 </Typography>
                 <Stack spacing={1.2}>
-                  <Button
-                    variant="outlined"
-                    onClick={handleSync}
-                    disabled={loadingGroups}
-                    sx={{ alignSelf: "flex-start" }}
-                  >
-                    {loadingGroups ? "Синхронизация..." : "Синхронизировать"}
-                  </Button>
                   <Select
                     size="small"
                     value={selectedGroupId}
@@ -195,9 +181,13 @@ function ScheduleImportPage() {
                   <Button
                     variant="contained"
                     onClick={handleShowSchedule}
-                    disabled={loadingSchedule || !selectedGroupId}
+                    disabled={loadingSchedule || loadingGroups}
                   >
-                    {loadingSchedule ? "Загрузка..." : "Показать расписание"}
+                    {loadingGroups
+                      ? "Загрузка групп..."
+                      : loadingSchedule
+                        ? "Загрузка..."
+                        : "Показать расписание"}
                   </Button>
                 </Stack>
                 {error ? (
@@ -215,12 +205,14 @@ function ScheduleImportPage() {
                 <Typography variant="h6" gutterBottom>
                   Сегодняшние пары
                 </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  День: {todayName}
+                </Typography>
                 <Divider sx={{ mb: 1.5 }} />
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>День</TableCell>
                         <TableCell>Время</TableCell>
                         <TableCell>Дисциплина</TableCell>
                         <TableCell align="right">Аудитория</TableCell>
@@ -229,16 +221,15 @@ function ScheduleImportPage() {
                     <TableBody>
                       {rows.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} align="center">
+                          <TableCell colSpan={3} align="center">
                             {scheduleLoaded
-                              ? "Для выбранной группы занятий не найдено"
+                              ? "На сегодня занятий не найдено"
                               : 'Нажмите "Показать расписание"'}
                           </TableCell>
                         </TableRow>
                       ) : (
                         rows.map((lesson) => (
                           <TableRow key={lesson.id} hover>
-                            <TableCell>{lesson.day}</TableCell>
                             <TableCell>{lesson.time}</TableCell>
                             <TableCell>{lesson.title}</TableCell>
                             <TableCell align="right">{lesson.room}</TableCell>
