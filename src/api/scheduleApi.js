@@ -50,3 +50,7 @@ export function importSchedule(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function syncScheduleReport() {
+  return apiRequest("/admin/shedule/report");
+}

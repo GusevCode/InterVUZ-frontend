@@ -7,6 +7,7 @@ import Tabs from "@mui/material/Tabs";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import AdminSheduleReportPage from "./pages/AdminSheduleReportPage";
 import CampusNavigationPage from "./pages/CampusNavigationPage";
 import ScheduleImportPage from "./pages/ScheduleImportPage";
 
@@ -57,6 +58,7 @@ function App() {
           <Route path="/" element={<Navigate to="/navigation" replace />} />
           <Route path="/navigation" element={<CampusNavigationPage />} />
           <Route path="/schedule" element={<ScheduleImportPage />} />
+          <Route path="/admin/shedule/report" element={<AdminSheduleReportPage />} />
         </Routes>
       </Container>
     </Box>
