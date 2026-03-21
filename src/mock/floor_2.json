@@ -1,0 +1,93 @@
+{
+  "id": "2",
+  "places": [
+    {
+      "id": "place_210",
+      "name": "Конференц-зал 210",
+      "tags": [
+        "conference"
+      ],
+      "description": "Конференц-зал в левом крыле 2 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "2",
+        "y": 155,
+        "x": 565
+      }
+    },
+    {
+      "id": "place_214",
+      "name": "Аудитория 214",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 214 рядом с центральным лестничным узлом.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "2",
+        "y": 120,
+        "x": 1050
+      }
+    },
+    {
+      "id": "place_225",
+      "name": "Читальный зал 225",
+      "tags": [
+        "library",
+        "study"
+      ],
+      "description": "Студенческий читальный зал в нижнем центральном блоке.",
+      "type": "library",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "2",
+        "y": 670,
+        "x": 1325
+      }
+    },
+    {
+      "id": "place_buffet",
+      "name": "Буфет",
+      "tags": [
+        "food",
+        "coffee"
+      ],
+      "description": "Буфет в правом крыле 2 этажа.",
+      "type": "cafeteria",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "2",
+        "y": 350,
+        "x": 2180
+      }
+    },
+    {
+      "id": "place_257",
+      "name": "Аудитория 257",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 257 у крайнего правого коридора.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "2",
+        "y": 410,
+        "x": 2450
+      }
+    }
+  ],
+  "width": 2721,
+  "alt": "Карта 2 этажа",
+  "height": 1197,
+  "building": "B1",
+  "label": "2",
+  "image": "floor_2.png"
+}

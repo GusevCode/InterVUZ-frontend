@@ -1,0 +1,557 @@
+{
+  "id": "1",
+  "places": [
+    {
+      "id": "place_102",
+      "name": "Кабинет 102",
+      "tags": [
+        "office"
+      ],
+      "description": "Кабинет 102 в административном блоке.",
+      "type": "office",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 360,
+        "y": 185
+      }
+    },
+    {
+      "id": "place_106",
+      "name": "Кабинет 106",
+      "tags": [
+        "office"
+      ],
+      "description": "Кабинет 106 в административном блоке.",
+      "type": "office",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 470,
+        "y": 105
+      }
+    },
+    {
+      "id": "place_106a",
+      "name": "Кабинет 106а",
+      "tags": [
+        "office"
+      ],
+      "description": "Кабинет 106а рядом с кабинетом 106.",
+      "type": "office",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 610,
+        "y": 105
+      }
+    },
+    {
+      "id": "place_110",
+      "name": "Аудитория 110",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 110 в правой верхней части 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2065,
+        "y": 125
+      }
+    },
+    {
+      "id": "place_112",
+      "name": "Аудитория 112",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 112 рядом с аудиторией 110.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2160,
+        "y": 125
+      }
+    },
+    {
+      "id": "place_114",
+      "name": "Аудитория 114",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 114 в правом крыле 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2270,
+        "y": 110
+      }
+    },
+    {
+      "id": "place_116",
+      "name": "Аудитория 116",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 116 в правом крыле 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2385,
+        "y": 110
+      }
+    },
+    {
+      "id": "place_118",
+      "name": "Аудитория 118",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 118 в правом крыле 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2495,
+        "y": 110
+      }
+    },
+    {
+      "id": "place_120",
+      "name": "Аудитория 120",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 120 в крайней правой верхней части схемы.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2605,
+        "y": 110
+      }
+    },
+    {
+      "id": "place_122",
+      "name": "Аудитория 122",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 122 под блоком аудиторий 114-120.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2415,
+        "y": 225
+      }
+    },
+    {
+      "id": "place_125",
+      "name": "Аудитория 125",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 125 в нижней центральной части этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 830,
+        "y": 735
+      }
+    },
+    {
+      "id": "place_121",
+      "name": "Аудитория 121",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 121 рядом с аудиторией 125.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1025,
+        "y": 735
+      }
+    },
+    {
+      "id": "place_129",
+      "name": "Аудитория 129",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 129 в центральном блоке 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 840,
+        "y": 575
+      }
+    },
+    {
+      "id": "place_127",
+      "name": "Аудитория 127",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 127 в центральном блоке 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1010,
+        "y": 575
+      }
+    },
+    {
+      "id": "place_105",
+      "name": "Аудитория 105",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 105 рядом с блоком компьютерных классов.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1170,
+        "y": 500
+      }
+    },
+    {
+      "id": "place_105a",
+      "name": "Аудитория 105а",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 105а под аудиторией 105.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1180,
+        "y": 595
+      }
+    },
+    {
+      "id": "place_109",
+      "name": "Аудитория 109",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 109 в блоке кабинетов над компьютерными классами.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1365,
+        "y": 470
+      }
+    },
+    {
+      "id": "place_109a",
+      "name": "Аудитория 109а",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 109а в блоке кабинетов над компьютерными классами.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1455,
+        "y": 470
+      }
+    },
+    {
+      "id": "place_109b",
+      "name": "Аудитория 109б",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 109б в блоке кабинетов над компьютерными классами.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1545,
+        "y": 470
+      }
+    },
+    {
+      "id": "place_109v",
+      "name": "Аудитория 109в",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 109в в блоке кабинетов над компьютерными классами.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1635,
+        "y": 470
+      }
+    },
+    {
+      "id": "place_111",
+      "name": "Аудитория 111",
+      "tags": [
+        "computer",
+        "classroom"
+      ],
+      "description": "Компьютерный класс 111.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1490,
+        "y": 610
+      }
+    },
+    {
+      "id": "place_113",
+      "name": "Аудитория 113",
+      "tags": [
+        "computer",
+        "classroom"
+      ],
+      "description": "Компьютерный класс 113.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1685,
+        "y": 610
+      }
+    },
+    {
+      "id": "place_115",
+      "name": "Аудитория 115",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 115 рядом с блоком 109.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1780,
+        "y": 470
+      }
+    },
+    {
+      "id": "place_117",
+      "name": "Аудитория 117",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 117 под аудиторией 115.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1780,
+        "y": 625
+      }
+    },
+    {
+      "id": "place_119",
+      "name": "Аудитория 119",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 119 у правой лестничной группы.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 1910,
+        "y": 715
+      }
+    },
+    {
+      "id": "place_131",
+      "name": "Аудитория 131",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 131 в правой центральной части 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2015,
+        "y": 445
+      }
+    },
+    {
+      "id": "place_133",
+      "name": "Аудитория 133",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 133 в правом крыле 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2100,
+        "y": 340
+      }
+    },
+    {
+      "id": "place_135",
+      "name": "Аудитория 135",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 135 в правом крыле 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2190,
+        "y": 340
+      }
+    },
+    {
+      "id": "place_137",
+      "name": "Аудитория 137",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 137 у правого перехода.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2265,
+        "y": 430
+      }
+    },
+    {
+      "id": "place_139",
+      "name": "Аудитория 139",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 139 у правого перехода.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2350,
+        "y": 430
+      }
+    },
+    {
+      "id": "place_141",
+      "name": "Аудитория 141",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 141 в правом крыле 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2435,
+        "y": 430
+      }
+    },
+    {
+      "id": "place_143",
+      "name": "Аудитория 143",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 143 в правом крыле 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2515,
+        "y": 430
+      }
+    },
+    {
+      "id": "place_145",
+      "name": "Аудитория 145",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 145 в правом крыле 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2590,
+        "y": 430
+      }
+    },
+    {
+      "id": "place_147",
+      "name": "Аудитория 147",
+      "tags": [
+        "classroom"
+      ],
+      "description": "Аудитория 147 в крайней правой части 1 этажа.",
+      "type": "classroom",
+      "isAccessible": true,
+      "coordinates": {
+        "building": "B1",
+        "floor": "1",
+        "x": 2645,
+        "y": 430
+      }
+    }
+  ],
+  "width": 2725,
+  "alt": "Карта 1 этажа",
+  "height": 1215,
+  "building": "B1",
+  "label": "1",
+  "image": "floor_1.png"
+}

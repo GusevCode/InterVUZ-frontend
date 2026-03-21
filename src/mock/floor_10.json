@@ -1,0 +1,12 @@
+﻿{
+    "id":  "10",
+    "places":  [
+
+               ],
+    "width":  2669,
+    "alt":  "Карта 10 этажа",
+    "height":  904,
+    "building":  "B1",
+    "label":  "10",
+    "image":  "floor_10.png"
+}
