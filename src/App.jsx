@@ -8,7 +8,6 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import AdminSheduleReportPage from "./pages/AdminSheduleReportPage";
-import CampusNavigationPage from "./pages/CampusNavigationPage";
 import MapConfigurePage from "./pages/MapConfigurePage";
 import MapPage from "./pages/MapPage";
 import ScheduleImportPage from "./pages/ScheduleImportPage";
@@ -23,8 +22,6 @@ function App() {
     currentTab = false;
   } else if (location.pathname.startsWith("/map")) {
     currentTab = "/map";
-  } else if (location.pathname.startsWith("/navigation")) {
-    currentTab = "/navigation";
   } else if (location.pathname.startsWith("/schedule")) {
     currentTab = "/schedule";
   }
@@ -58,7 +55,6 @@ function App() {
               ".MuiTabs-indicator": { height: 3 },
             }}
           >
-            <Tab value="/navigation" label="Навигация" />
             <Tab value="/map" label="Карта" />
             <Tab value="/schedule" label="Расписание" />
           </Tabs>
@@ -68,8 +64,7 @@ function App() {
 
       <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3 } }}>
         <Routes>
-          <Route path="/" element={<Navigate to="/navigation" replace />} />
-          <Route path="/navigation" element={<CampusNavigationPage />} />
+          <Route path="/" element={<Navigate to="/map" replace />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/map-configure" element={<MapConfigurePage />} />
           <Route path="/schedule" element={<ScheduleImportPage />} />
