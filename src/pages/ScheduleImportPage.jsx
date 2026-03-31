@@ -18,6 +18,8 @@ import {
   fetchGroupSchedule,
   fetchScheduleGroups,
 } from "../api/scheduleApi";
+import InputLabel from "@mui/material/InputLabel";
+import FormControl from "@mui/material/FormControl";
 
 const dayNames = {
   1: "Пн",
@@ -42,12 +44,15 @@ function ScheduleImportPage() {
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [error, setError] = useState("");
+  const [selectedDay, setSelectedDay] = useState(getTodayScheduleDay());
+  
   const todayScheduleDay = getTodayScheduleDay();
   const todayName = dayNames[todayScheduleDay] ?? "Сегодня";
+  const selectedDayName = dayNames[selectedDay] ?? "Выбранный день";
 
   const rows = useMemo(() => {
     return [...events]
-      .filter((event) => event.day === todayScheduleDay)
+      .filter((event) => event.day === selectedDay)
       .sort((a, b) => {
         if (a.startTimeHourNum !== b.startTimeHourNum) {
           return a.startTimeHourNum - b.startTimeHourNum;
@@ -61,9 +66,9 @@ function ScheduleImportPage() {
           event.discipline?.fullName ??
           event.discipline?.abbr ??
           "Без названия дисциплины",
-        room: event.audiences?.[0]?.name ?? "Не указана",
+        room: event.audiences?.[0]?.name ?? "Не указаны",
       }));
-  }, [events, todayScheduleDay]);
+  }, [events, selectedDay]);
 
   const loadGroups = async () => {
     setLoadingGroups(true);
@@ -140,15 +145,7 @@ function ScheduleImportPage() {
     <Card sx={{ borderRadius: 2 }}>
       <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Импорт расписания
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 0.5 }}>
-          Загружайте или синхронизируйте расписание, чтобы видеть пары, время и
-          аудитории в одном месте.
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          После импорта можно сразу перейти к построению маршрута до нужной
-          аудитории.
+          Расписание
         </Typography>
 
         <Grid container spacing={2}>
@@ -203,12 +200,25 @@ function ScheduleImportPage() {
             <Card variant="outlined" sx={{ height: "100%" }}>
               <CardContent sx={{ p: 2.5 }}>
                 <Typography variant="h6" gutterBottom>
-                  Сегодняшние пары
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  День: {todayName}
+                  Расписание по дням
                 </Typography>
                 <Divider sx={{ mb: 1.5 }} />
+                
+                <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
+                  <InputLabel>День недели</InputLabel>
+                  <Select
+                    value={selectedDay}
+                    label="День недели"
+                    onChange={(event) => setSelectedDay(event.target.value)}
+                  >
+                    {Object.entries(dayNames).map(([dayNum, dayName]) => (
+                      <MenuItem key={dayNum} value={Number(dayNum)}>
+                        {dayName} {dayNum === todayScheduleDay ? "(сегодня)" : ""}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
@@ -223,16 +233,16 @@ function ScheduleImportPage() {
                         <TableRow>
                           <TableCell colSpan={3} align="center">
                             {scheduleLoaded
-                              ? "На сегодня занятий не найдено"
+                              ? `На ${selectedDayName} занятий не найдено`
                               : 'Нажмите "Показать расписание"'}
                           </TableCell>
                         </TableRow>
                       ) : (
                         rows.map((lesson) => (
                           <TableRow key={lesson.id} hover>
-                            <TableCell>{lesson.time}</TableCell>
+                            <TableCell sx={{ whiteSpace: "nowrap" }}>{lesson.time}</TableCell>
                             <TableCell>{lesson.title}</TableCell>
-                            <TableCell align="right">{lesson.room}</TableCell>
+                            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>{lesson.room}</TableCell>
                           </TableRow>
                         ))
                       )}

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -297,16 +297,6 @@ function MapPage() {
                     </MenuItem>
                   ))}
                 </TextField>
-                <FormControlLabel
-                  control={(
-                    <Switch
-                      checked={accessibleOnly}
-                      onChange={(event) => setAccessibleOnly(event.target.checked)}
-                      size="small"
-                    />
-                  )}
-                  label="Только доступный маршрут"
-                />
                 <Button
                   variant="contained"
                   onClick={handleBuildRoute}
@@ -370,10 +360,10 @@ function MapPage() {
                         selected={isSelected}
                         onClick={() => setSelectedPlaceId(place.id)}
                         sx={{
-                          px: 0,
+                          px: 1,
                           py: 1.25,
-                          borderBottom: "1px solid",
-                          borderColor: "divider",
+                          borderRadius: 2,
+                          mb: 0.5,
                           alignItems: "flex-start",
                         }}
                       >
@@ -468,10 +458,7 @@ function MapPage() {
                     color: "text.secondary",
                   }}
                 >
-                  <Typography variant="subtitle1">Схема корпуса недоступна</Typography>
-                  <Typography variant="body2">
-                    Добавьте файл изображения в `src/data`, чтобы подложка карты отображалась на странице.
-                  </Typography>
+                  <Typography variant="subtitle1">загрузка схемы</Typography>
                 </Stack>
               )}
 

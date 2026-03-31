@@ -38,9 +38,9 @@ function App() {
             py: { xs: 1.5, sm: 1 },
           }}
         >
-          <Box sx={{ mr: 2 }}>
-            <Typography variant="h6">InterVUZ</Typography>
-            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+          <Box sx={{ mr: 1, lineHeight: 1 }}>
+            <Typography variant="h6" sx={{ lineHeight: 1.1 }}>InterVUZ</Typography>
+            <Typography variant="caption" sx={{ opacity: 0.9, lineHeight: 1 }}>
               Сервис навигации и расписания
             </Typography>
           </Box>

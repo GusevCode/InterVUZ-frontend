@@ -1,4 +1,4 @@
-﻿const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
+const apiBaseUrl = "/api";
 
 const localMapModules = import.meta.glob("../data/*.{png,jpg,jpeg,webp,avif,gif,svg}", {
   eager: true,
