@@ -4,8 +4,13 @@ const localMapModules = import.meta.glob("../data/*.{png,jpg,jpeg,webp,avif,gif,
   eager: true,
   import: "default",
 });
+const localMapVectorModules = import.meta.glob("../data/*.map.json", {
+  eager: true,
+  import: "default",
+});
 
 let cachedMapImagePromise = null;
+let cachedMapVectorPromise = null;
 let cachedPlacesPromise = null;
 
 function readImageSizeFromSrc(src) {
@@ -127,6 +132,12 @@ function compareFloors(left, right) {
 
 function getLocalMapSource() {
   const entries = Object.entries(localMapModules).sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"));
+  const svgEntry = entries.find(([filePath]) => filePath.toLowerCase().endsWith(".svg"));
+  return svgEntry ?? entries[0] ?? null;
+}
+
+function getLocalMapVectorSource() {
+  const entries = Object.entries(localMapVectorModules).sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"));
   return entries[0] ?? null;
 }
 
@@ -148,6 +159,28 @@ async function loadMapImage() {
     height: imageSize.height,
     alt: "Схема корпуса",
     src,
+  };
+}
+
+async function loadMapVector() {
+  const mapSource = getLocalMapVectorSource();
+
+  if (!mapSource) {
+    return null;
+  }
+
+  const [path, data] = mapSource;
+  const fileName = path.split("/").pop() ?? "map.json";
+  const viewBox = Array.isArray(data?.viewBox) ? data.viewBox : null;
+  const width = Number(data?.width) || (viewBox?.[2] ? Number(viewBox[2]) : 0) || 0;
+  const height = Number(data?.height) || (viewBox?.[3] ? Number(viewBox[3]) : 0) || 0;
+
+  return {
+    ...data,
+    id: fileName,
+    label: data?.label ?? "SVG map",
+    width,
+    height,
   };
 }
 
@@ -200,6 +233,14 @@ export async function getMapImage() {
   }
 
   return cachedMapImagePromise;
+}
+
+export async function getMapVector() {
+  if (!cachedMapVectorPromise) {
+    cachedMapVectorPromise = loadMapVector();
+  }
+
+  return cachedMapVectorPromise;
 }
 
 export async function getPlaces(filters = {}) {
