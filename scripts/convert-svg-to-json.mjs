@@ -69,6 +69,26 @@ function parsePoints(value) {
   return points;
 }
 
+function extractChildText(nodes, tagName) {
+  if (!Array.isArray(nodes)) {
+    return null;
+  }
+  const entry = nodes.find((node) => node[tagName]);
+  if (!entry) {
+    return null;
+  }
+  const children = entry[tagName];
+  if (!Array.isArray(children)) {
+    return null;
+  }
+  const textNode = children.find((child) => Object.prototype.hasOwnProperty.call(child, "#text"));
+  if (!textNode) {
+    return null;
+  }
+  const value = String(textNode["#text"]).trim();
+  return value ? value : null;
+}
+
 function pointsToPath(points, closePath) {
   if (!points.length) {
     return null;
@@ -320,7 +340,7 @@ function shouldSkip(style) {
   return false;
 }
 
-function addElement({ id, d, style }) {
+function addElement({ id, d, style, title }) {
   if (!d) {
     return;
   }
@@ -333,6 +353,7 @@ function addElement({ id, d, style }) {
 
   elements.push({
     id: id || null,
+    title: title || undefined,
     d,
     ...Object.fromEntries(
       Object.entries(normalizedStyle).filter(([, value]) => value !== null && value !== undefined),
@@ -367,6 +388,7 @@ function collect(nodes, inheritedStyle) {
         id: attrs.id,
         d: attrs.d ?? null,
         style,
+        title: extractChildText(childNodes, "title"),
       });
       return;
     }
@@ -383,6 +405,7 @@ function collect(nodes, inheritedStyle) {
           ry: parseNumber(attrs.ry),
         }),
         style,
+        title: extractChildText(childNodes, "title"),
       });
       return;
     }
@@ -392,6 +415,7 @@ function collect(nodes, inheritedStyle) {
         id: attrs.id,
         d: circleToPath(parseNumber(attrs.cx), parseNumber(attrs.cy), parseNumber(attrs.r)),
         style,
+        title: extractChildText(childNodes, "title"),
       });
       return;
     }
@@ -401,6 +425,7 @@ function collect(nodes, inheritedStyle) {
         id: attrs.id,
         d: ellipseToPath(parseNumber(attrs.cx), parseNumber(attrs.cy), parseNumber(attrs.rx), parseNumber(attrs.ry)),
         style,
+        title: extractChildText(childNodes, "title"),
       });
       return;
     }
@@ -415,6 +440,7 @@ function collect(nodes, inheritedStyle) {
           parseNumber(attrs.y2),
         ),
         style,
+        title: extractChildText(childNodes, "title"),
       });
       return;
     }
@@ -424,6 +450,7 @@ function collect(nodes, inheritedStyle) {
         id: attrs.id,
         d: pointsToPath(parsePoints(attrs.points), false),
         style,
+        title: extractChildText(childNodes, "title"),
       });
       return;
     }
@@ -433,6 +460,7 @@ function collect(nodes, inheritedStyle) {
         id: attrs.id,
         d: pointsToPath(parsePoints(attrs.points), true),
         style,
+        title: extractChildText(childNodes, "title"),
       });
       return;
     }
