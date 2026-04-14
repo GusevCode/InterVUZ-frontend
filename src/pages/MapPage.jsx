@@ -34,8 +34,9 @@ import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 
 import Typography from "@mui/material/Typography";
-import { buildRoute, getAvailableFloors, getMapImage, getMapVector, getPlaces } from "../api/mapApi";
+import { buildRoute, getAvailableFloors, getMapImage, getMapVectors, getMapGraphs, getPlaces } from "../api/mapApi";
 import Map3D from "../components/Map3D";
+import MapRoutePlanner from "../components/MapRoutePlanner";
 
 
 const placeTypeLabels = {
@@ -92,6 +93,12 @@ function getRoutePointCoordinates(point, mapWidth, mapHeight) {
   };
 }
 
+function getMapBaseName(fileName = "") {
+  return String(fileName)
+    .replace(/\.map\.json$/i, "")
+    .replace(/\.graph\.json$/i, "");
+}
+
 
 
 function MapPage() {
@@ -101,6 +108,10 @@ function MapPage() {
   const [selectedFloorId, setSelectedFloorId] = useState("");
   const [mapImage, setMapImage] = useState(null);
   const [mapVector, setMapVector] = useState(null);
+  const [mapVectors, setMapVectors] = useState([]);
+  const [selectedMapId, setSelectedMapId] = useState("");
+  const [mapGraphs, setMapGraphs] = useState([]);
+  const [mapGraph, setMapGraph] = useState(null);
   const [places, setPlaces] = useState([]);
   const [selectedPlaceId, setSelectedPlaceId] = useState("");
 
@@ -113,6 +124,8 @@ function MapPage() {
   const [route, setRoute] = useState(null);
 
   const [selectedVectorId, setSelectedVectorId] = useState("");
+  const [showLabels, setShowLabels] = useState(true);
+  const [localRoutePoints, setLocalRoutePoints] = useState([]);
 
   const [routeError, setRouteError] = useState("");
 
@@ -132,16 +145,32 @@ function MapPage() {
       setMapWarning("");
 
       try {
-        const [image, vector] = await Promise.all([getMapImage(), getMapVector()]);
+        const [image, vectors, graphs] = await Promise.all([
+          getMapImage(),
+          getMapVectors(),
+          getMapGraphs(),
+        ]);
 
         if (!isMounted) {
           return;
         }
 
         setMapImage(image);
-        setMapVector(vector);
+        setMapVectors(vectors);
+        setMapGraphs(graphs);
 
-        if (!image && !vector) {
+        const fallbackId = vectors[0]?.id || graphs[0]?.id || "";
+        const initialMapId = selectedMapId || fallbackId;
+        const baseName = getMapBaseName(initialMapId);
+        const nextVector = vectors.find((item) => getMapBaseName(item.id) === baseName) || null;
+        const nextGraph = graphs.find((item) => getMapBaseName(item.id) === baseName) || null;
+
+        setSelectedMapId((currentValue) => currentValue || initialMapId);
+        setMapVector(nextVector);
+        setMapGraph(nextGraph);
+        setLocalRoutePoints([]);
+
+        if (!image && !nextVector) {
           setMapWarning("В `src/data` не найден файл схемы. Добавьте туда PNG/JPG/SVG или *.map.json.");
         }
       } catch (loadError) {
@@ -151,7 +180,12 @@ function MapPage() {
 
         setMapImage(null);
         setMapVector(null);
+        setMapVectors([]);
+        setMapGraphs([]);
+        setSelectedMapId("");
+        setMapGraph(null);
         setMapWarning(loadError.message || "Не удалось загрузить схему.");
+        setLocalRoutePoints([]);
       } finally {
         if (isMounted) {
           setIsLoadingMap(false);
@@ -218,6 +252,21 @@ function MapPage() {
     };
 
   }, []);
+
+  useEffect(() => {
+    if (!selectedMapId) {
+      return;
+    }
+
+    const baseName = getMapBaseName(selectedMapId);
+    const nextVector = mapVectors.find((item) => getMapBaseName(item.id) === baseName) || null;
+    const nextGraph = mapGraphs.find((item) => getMapBaseName(item.id) === baseName) || null;
+
+    setMapVector(nextVector);
+    setMapGraph(nextGraph);
+    setSelectedVectorId("");
+    setLocalRoutePoints([]);
+  }, [selectedMapId, mapVectors, mapGraphs]);
 
 
 
@@ -412,6 +461,26 @@ function MapPage() {
 
               </Box>
 
+              {mapVectors.length > 0 ? (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Схемы этажей
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {mapVectors.map((vector) => (
+                      <Chip
+                        key={vector.id}
+                        label={vector.label}
+                        clickable
+                        color={vector.id === selectedMapId ? "primary" : "default"}
+                        variant={vector.id === selectedMapId ? "filled" : "outlined"}
+                        onClick={() => setSelectedMapId(vector.id)}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              ) : null}
+
 
 
               <Box>
@@ -548,7 +617,25 @@ function MapPage() {
 
                 </Button>
 
+                {is3D ? (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={showLabels}
+                        onChange={(event) => setShowLabels(event.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label="Подписи на карте"
+                  />
+                ) : null}
+
                 {routeError ? <Alert severity="error">{routeError}</Alert> : null}
+
+                <MapRoutePlanner
+                  graph={mapGraph}
+                  onRouteChange={setLocalRoutePoints}
+                />
 
                 {route ? (
 
@@ -793,8 +880,14 @@ function MapPage() {
             >
               {is3D ? (
                 <Box sx={{ width: "100%", height: "100%", position: "relative" }}>
-                  <Map3D mapVector={mapVector} selectedId={selectedVectorId} onSelect={setSelectedVectorId} />
-                  {selectedVectorId ? (
+                  <Map3D
+                    mapVector={mapVector}
+                    selectedId={selectedVectorId}
+                    onSelect={setSelectedVectorId}
+                    showLabels={showLabels}
+                    routePoints={localRoutePoints}
+                  />
+                  {showLabels && selectedVectorId ? (
                     <Box
                       sx={{
                         position: "absolute",

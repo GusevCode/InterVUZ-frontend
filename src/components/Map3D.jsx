@@ -80,7 +80,13 @@ function CameraRig({ width, height }) {
   return null;
 }
 
-export default function Map3D({ mapVector, selectedId, onSelect }) {
+export default function Map3D({
+  mapVector,
+  selectedId,
+  onSelect,
+  showLabels = true,
+  routePoints = [],
+}) {
   const [hoveredId, setHoveredId] = useState(null);
   const sourceElements = useMemo(
     () => (mapVector?.elements ?? []).filter((element) => element?.d),
@@ -189,9 +195,17 @@ export default function Map3D({ mapVector, selectedId, onSelect }) {
     })
   ), [shapes, roomDepth]);
 
+  const routeGeometry = useMemo(() => {
+    if (!Array.isArray(routePoints) || routePoints.length < 2) {
+      return null;
+    }
+    const points = routePoints.map((point) => new THREE.Vector3(point.x, point.y, roomDepth + 10));
+    return new THREE.BufferGeometry().setFromPoints(points);
+  }, [routePoints, roomDepth]);
+
   const meshes = useMemo(
-    () => [...fillMeshes, ...strokeMeshes, ...outlineMeshes],
-    [fillMeshes, strokeMeshes, outlineMeshes],
+    () => [...fillMeshes, ...strokeMeshes, ...outlineMeshes].concat(routeGeometry ? [{ geometry: routeGeometry }] : []),
+    [fillMeshes, strokeMeshes, outlineMeshes, routeGeometry],
   );
 
   const labelItems = useMemo(() => (
@@ -206,6 +220,20 @@ export default function Map3D({ mapVector, selectedId, onSelect }) {
       if (!points.length) {
         return [];
       }
+      let minX = Number.POSITIVE_INFINITY;
+      let maxX = Number.NEGATIVE_INFINITY;
+      let minY = Number.POSITIVE_INFINITY;
+      let maxY = Number.NEGATIVE_INFINITY;
+      let area = 0;
+      points.forEach((point, index) => {
+        const next = points[(index + 1) % points.length];
+        area += point.x * next.y - next.x * point.y;
+        minX = Math.min(minX, point.x);
+        maxX = Math.max(maxX, point.x);
+        minY = Math.min(minY, point.y);
+        maxY = Math.max(maxY, point.y);
+      });
+      area = Math.abs(area / 2);
       const centroid = points.reduce(
         (acc, point) => {
           acc.x += point.x;
@@ -221,10 +249,43 @@ export default function Map3D({ mapVector, selectedId, onSelect }) {
         label,
         x: centroid.x / count,
         y: centroid.y / count,
-        z: roomDepth + 3,
+        z: roomDepth + 8,
+        area,
+        width: maxX - minX,
+        height: maxY - minY,
       }];
     })
   ), [shapes, roomDepth]);
+
+  const visibleLabels = useMemo(() => {
+    const selectedSet = new Set([selectedId, hoveredId].filter(Boolean));
+    const sorted = [...labelItems]
+      .filter((item) => !selectedSet.has(item.id))
+      .sort((left, right) => (right.area || 0) - (left.area || 0));
+    const accepted = [];
+    const minDistance = Math.max(width, height) * 0.035;
+
+    sorted.forEach((candidate) => {
+      const maxSize = Math.max(candidate.width || 0, candidate.height || 0);
+      const threshold = Math.max(minDistance, maxSize * 0.5);
+      const overlaps = accepted.some((item) => {
+        const dx = item.x - candidate.x;
+        const dy = item.y - candidate.y;
+        return Math.hypot(dx, dy) < threshold;
+      });
+      if (!overlaps) {
+        accepted.push(candidate);
+      }
+    });
+
+    labelItems.forEach((item) => {
+      if (selectedSet.has(item.id)) {
+        accepted.push({ ...item, z: roomDepth + 14, elevated: true });
+      }
+    });
+
+    return accepted;
+  }, [labelItems, selectedId, hoveredId, width, height, roomDepth]);
 
   useEffect(() => () => {
     meshes.forEach((mesh) => mesh.geometry.dispose());
@@ -317,7 +378,12 @@ export default function Map3D({ mapVector, selectedId, onSelect }) {
             </lineLoop>
           );
         })}
-        {labelItems.map((label) => (
+        {routeGeometry ? (
+          <line geometry={routeGeometry}>
+            <lineBasicMaterial color="#f97316" linewidth={2} />
+          </line>
+        ) : null}
+        {showLabels ? visibleLabels.map((label) => (
           <Html
             key={label.key}
             position={[label.x, label.y, label.z]}
@@ -330,10 +396,10 @@ export default function Map3D({ mapVector, selectedId, onSelect }) {
               style={{
                 padding: "2px 6px",
                 borderRadius: 6,
-                background: "rgba(15, 23, 42, 0.65)",
+                background: label.elevated ? "rgba(15, 23, 42, 0.8)" : "rgba(15, 23, 42, 0.65)",
                 color: "#ffffff",
-                fontSize: 11,
-                fontWeight: 600,
+                fontSize: label.elevated ? 12 : 10,
+                fontWeight: label.elevated ? 700 : 600,
                 letterSpacing: 0.2,
                 whiteSpace: "nowrap",
               }}
@@ -341,7 +407,7 @@ export default function Map3D({ mapVector, selectedId, onSelect }) {
               {label.label}
             </div>
           </Html>
-        ))}
+        )) : null}
       </group>
       <OrbitControls
         enableDamping

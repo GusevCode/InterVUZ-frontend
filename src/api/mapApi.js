@@ -1,4 +1,4 @@
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
+﻿const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
 const localMapModules = import.meta.glob("../data/*.{png,jpg,jpeg,webp,avif,gif,svg}", {
   eager: true,
@@ -8,9 +8,15 @@ const localMapVectorModules = import.meta.glob("../data/*.map.json", {
   eager: true,
   import: "default",
 });
+const localMapGraphModules = import.meta.glob("../data/*.graph.json", {
+  eager: true,
+  import: "default",
+});
 
 let cachedMapImagePromise = null;
 let cachedMapVectorPromise = null;
+let cachedMapVectorsPromise = null;
+let cachedMapGraphsPromise = null;
 let cachedPlacesPromise = null;
 
 function readImageSizeFromSrc(src) {
@@ -25,7 +31,7 @@ function readImageSizeFromSrc(src) {
     };
 
     image.onerror = () => {
-      reject(new Error("Не удалось определить размеры схемы корпуса."));
+      reject(new Error("РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСЂРµРґРµР»РёС‚СЊ СЂР°Р·РјРµСЂС‹ СЃС…РµРјС‹ РєРѕСЂРїСѓСЃР°."));
     };
 
     image.src = src;
@@ -51,7 +57,7 @@ async function fetchJson(path, query) {
   const response = await fetch(buildUrl(path, query));
 
   if (!response.ok) {
-    throw new Error(`Запрос ${path} завершился с кодом ${response.status}.`);
+    throw new Error(`Р—Р°РїСЂРѕСЃ ${path} Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РєРѕРґРѕРј ${response.status}.`);
   }
 
   return response.json();
@@ -67,7 +73,7 @@ async function postJson(path, body) {
   });
 
   if (!response.ok) {
-    throw new Error(`Запрос ${path} завершился с кодом ${response.status}.`);
+    throw new Error(`Р—Р°РїСЂРѕСЃ ${path} Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РєРѕРґРѕРј ${response.status}.`);
   }
 
   return response.json();
@@ -75,7 +81,7 @@ async function postJson(path, body) {
 
 function normalizeBuilding(building) {
   const value = String(building ?? "").trim();
-  const match = value.match(/^(?:B|Б)?\s*(\d+[A-Za-zА-Яа-я]?)$/i);
+  const match = value.match(/^(?:B|\u0411)?\s*(\d+[\p{L}]?)$/iu);
 
   if (!match) {
     return value;
@@ -141,6 +147,28 @@ function getLocalMapVectorSource() {
   return entries[0] ?? null;
 }
 
+function getVectorLabel(fileName) {
+  const baseName = fileName.replace(/\.map\.json$/i, "");
+  const match = baseName.match(/floor[_-]?(\d+)/i);
+
+  if (match) {
+    return `\u042D\u0442\u0430\u0436 ${match[1]}`;
+  }
+
+  return baseName || "\u0421\u0445\u0435\u043C\u0430";
+}
+
+function getGraphLabel(fileName) {
+  const baseName = fileName.replace(/\.graph\.json$/i, "");
+  const match = baseName.match(/floor[_-]?(\d+)/i);
+
+  if (match) {
+    return `\u042D\u0442\u0430\u0436 ${match[1]}`;
+  }
+
+  return baseName || "\u041C\u0430\u0440\u0448\u0440\u0443\u0442";
+}
+
 async function loadMapImage() {
   const mapSource = getLocalMapSource();
 
@@ -154,23 +182,16 @@ async function loadMapImage() {
 
   return {
     id: fileName,
-    label: "Схема корпуса",
+    label: "РЎС…РµРјР° РєРѕСЂРїСѓСЃР°",
     width: imageSize.width,
     height: imageSize.height,
-    alt: "Схема корпуса",
+    alt: "РЎС…РµРјР° РєРѕСЂРїСѓСЃР°",
     src,
   };
 }
 
-async function loadMapVector() {
-  const mapSource = getLocalMapVectorSource();
-
-  if (!mapSource) {
-    return null;
-  }
-
-  const [path, data] = mapSource;
-  const fileName = path.split("/").pop() ?? "map.json";
+function normalizeMapVector(entryPath, data) {
+  const fileName = entryPath.split("/").pop() ?? "map.json";
   const viewBox = Array.isArray(data?.viewBox) ? data.viewBox : null;
   const width = Number(data?.width) || (viewBox?.[2] ? Number(viewBox[2]) : 0) || 0;
   const height = Number(data?.height) || (viewBox?.[3] ? Number(viewBox[3]) : 0) || 0;
@@ -178,10 +199,36 @@ async function loadMapVector() {
   return {
     ...data,
     id: fileName,
-    label: data?.label ?? "SVG map",
+    label: data?.label ?? getVectorLabel(fileName),
     width,
     height,
   };
+}
+
+async function loadMapVectors() {
+  const entries = Object.entries(localMapVectorModules).sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"));
+  return entries.map(([entryPath, data]) => normalizeMapVector(entryPath, data));
+}
+
+async function loadMapVector() {
+  const vectors = await loadMapVectors();
+  return vectors[0] ?? null;
+}
+
+function normalizeMapGraph(entryPath, data) {
+  const fileName = entryPath.split("/").pop() ?? "graph.json";
+  return {
+    ...data,
+    id: fileName,
+    label: data?.label ?? getGraphLabel(fileName),
+    nodes: Array.isArray(data?.nodes) ? data.nodes : [],
+    edges: Array.isArray(data?.edges) ? data.edges : [],
+  };
+}
+
+async function loadMapGraphs() {
+  const entries = Object.entries(localMapGraphModules).sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"));
+  return entries.map(([entryPath, data]) => normalizeMapGraph(entryPath, data));
 }
 
 async function loadAllPlaces() {
@@ -243,6 +290,22 @@ export async function getMapVector() {
   return cachedMapVectorPromise;
 }
 
+export async function getMapVectors() {
+  if (!cachedMapVectorsPromise) {
+    cachedMapVectorsPromise = loadMapVectors();
+  }
+
+  return cachedMapVectorsPromise;
+}
+
+export async function getMapGraphs() {
+  if (!cachedMapGraphsPromise) {
+    cachedMapGraphsPromise = loadMapGraphs();
+  }
+
+  return cachedMapGraphsPromise;
+}
+
 export async function getPlaces(filters = {}) {
   const places = await getAllPlaces();
   const normalizedBuilding = filters.building ? normalizeBuilding(filters.building) : "";
@@ -291,3 +354,4 @@ export async function buildRoute({ fromPlaceId, toPlaceId, accessibleOnly = fals
       : [],
   };
 }
+
