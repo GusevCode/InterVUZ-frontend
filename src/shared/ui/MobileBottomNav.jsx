@@ -76,7 +76,7 @@ function ProfileIcon({ active }) {
 const NAV_TABS = [
   { label: "Карта", path: "/map", Icon: MapIcon },
   { label: "Расписание", path: "/schedule", Icon: ScheduleIcon },
-  { label: "Сервисы", path: "/booking", Icon: ServicesIcon },
+  { label: "Новости", path: "/news", Icon: ServicesIcon },
   { label: "Профиль", path: null, Icon: ProfileIcon },
 ];
 
@@ -86,9 +86,6 @@ function MobileBottomNav() {
 
   const isActive = (path) => {
     if (!path) return false;
-    if (path === "/booking") {
-      return location.pathname.startsWith("/booking") || location.pathname.startsWith("/news");
-    }
     return location.pathname.startsWith(path);
   };
 

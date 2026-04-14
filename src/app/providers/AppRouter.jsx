@@ -3,7 +3,7 @@ import MapPage from "../../pages/MapPage/index";
 import SchedulePage from "../../pages/SchedulePage/index";
 import MapConfigurePage from "../../pages/MapConfigurePage/index";
 import NewsPage from "../../pages/NewsPage/index";
-import BookingPage from "../../pages/BookingPage/index";
+// import BookingPage from "../../pages/BookingPage/index";
 
 function AppRouter() {
     return (
@@ -13,7 +13,7 @@ function AppRouter() {
             <Route path="/map-configure" element={<MapConfigurePage />} />
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/news" element={<NewsPage />} />
-            <Route path="/booking" element={<BookingPage />} />
+            {/* <Route path="/booking" element={<BookingPage />} /> */}
         </Routes>
     )
 }

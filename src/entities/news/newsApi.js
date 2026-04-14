@@ -10,7 +10,7 @@ const MOCK_NEWS = [
     title: "Стенд МГТУ им. Н.Э. Баумана на выставке «Навигатор поступления» посетили более 1000 человек",
     preview_text: "На выставке работали представители Приёмной комиссии",
     published_at: { day: "13", month: "апреля", year: "2026" },
-    imagePreview: "https://api.www.bmstu.ru/upload/news/15762/69dcfbce12615.jpg",
+    imagePreview: "https://picsum.photos/seed/navigator/600/360",
     tags: [{ id: 14, slug: "postupausim", title: "Поступающим", color: "#10aa00" }],
     page_url: "/news/stend-mgtu-im-n-e-baumana-na-vystavke-navigator-postupleniya-posetili-bolee-1000-chelovek",
   },
