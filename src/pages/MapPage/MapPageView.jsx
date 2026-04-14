@@ -6,6 +6,7 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
@@ -13,9 +14,12 @@ import ListItemText from "@mui/material/ListItemText";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import Map3D from "../../components/Map3D";
+import MapRoutePlanner from "../../components/MapRoutePlanner";
 
 const M = {
   sectionBg: "linear-gradient(180deg, rgba(24, 40, 66, 0.58) 0%, rgba(18, 31, 53, 0.95) 100%), #121F35",
@@ -54,6 +58,13 @@ function MobileMapView({
   error,
   mapWarning,
   mapImage,
+  mapVector,
+  is3D,
+  hasMapAsset,
+  selectedVectorId,
+  setSelectedVectorId,
+  showLabels,
+  localRoutePoints,
   mapWidth,
   mapHeight,
   routePoints,
@@ -71,9 +82,9 @@ function MobileMapView({
           border: "1px dashed #3D5683",
           borderRadius: "18px",
           overflow: "hidden",
-          aspectRatio: mapImage ? `${mapWidth} / ${mapHeight}` : "4 / 3",
+          aspectRatio: hasMapAsset ? `${mapWidth} / ${mapHeight}` : "4 / 3",
           position: "relative",
-          bgcolor: mapImage ? "#0a1222" : "transparent",
+          bgcolor: is3D ? "transparent" : mapImage ? "#0a1222" : "transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -94,6 +105,34 @@ function MobileMapView({
               Загрузка карты…
             </Typography>
           </Stack>
+        ) : is3D ? (
+          <Box sx={{ width: "100%", height: "100%", position: "relative" }}>
+            <Map3D
+              mapVector={mapVector}
+              selectedId={selectedVectorId}
+              onSelect={setSelectedVectorId}
+              showLabels={showLabels}
+              routePoints={localRoutePoints}
+            />
+            {showLabels && selectedVectorId ? (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: 1,
+                  bgcolor: "rgba(15, 23, 42, 0.75)",
+                  color: "#ffffff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                {`Выбрано: ${selectedVectorId}`}
+              </Box>
+            ) : null}
+          </Box>
         ) : mapImage ? (
           <>
             <Box
@@ -507,8 +546,21 @@ function MapPageView({
   selectedPlace,
   formatPlaceType,
   mapImage,
+  mapVector,
+  mapVectors,
+  selectedMapId,
+  setSelectedMapId,
+  mapGraph,
+  selectedVectorId,
+  setSelectedVectorId,
+  showLabels,
+  setShowLabels,
+  localRoutePoints,
+  setLocalRoutePoints,
   mapWidth,
   mapHeight,
+  hasMapAsset,
+  is3D,
   routePoints,
   routePolylinePoints,
   getCoordinatePercent,
@@ -538,6 +590,13 @@ function MapPageView({
         error={error}
         mapWarning={mapWarning}
         mapImage={mapImage}
+        mapVector={mapVector}
+        is3D={is3D}
+        hasMapAsset={hasMapAsset}
+        selectedVectorId={selectedVectorId}
+        setSelectedVectorId={setSelectedVectorId}
+        showLabels={showLabels}
+        localRoutePoints={localRoutePoints}
         mapWidth={mapWidth}
         mapHeight={mapHeight}
         routePoints={routePoints}
@@ -561,6 +620,26 @@ function MapPageView({
                   Карта корпуса
                 </Typography>
               </Box>
+
+              {mapVectors.length > 0 ? (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Схемы этажей
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {mapVectors.map((vector) => (
+                      <Chip
+                        key={vector.id}
+                        label={vector.label}
+                        clickable
+                        color={vector.id === selectedMapId ? "primary" : "default"}
+                        variant={vector.id === selectedMapId ? "filled" : "outlined"}
+                        onClick={() => setSelectedMapId(vector.id)}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              ) : null}
 
               <Box>
                 <Typography variant="subtitle2" gutterBottom>
@@ -623,7 +702,23 @@ function MapPageView({
                 <Button variant="contained" onClick={handleBuildRoute} disabled={isRouteDisabled}>
                   {isBuildingRoute ? "Строим маршрут..." : "Построить маршрут"}
                 </Button>
+                {is3D ? (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={showLabels}
+                        onChange={(event) => setShowLabels(event.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label="Подписи на карте"
+                  />
+                ) : null}
                 {routeError ? <Alert severity="error">{routeError}</Alert> : null}
+                <MapRoutePlanner
+                  graph={mapGraph}
+                  onRouteChange={setLocalRoutePoints}
+                />
                 {route ? (
                   <Card variant="outlined">
                     <CardContent sx={{ p: 2 }}>
@@ -740,14 +835,43 @@ function MapPageView({
                 overflow: "hidden",
                 border: "1px solid",
                 borderColor: "divider",
-                bgcolor: mapImage ? "#f4f5f7" : "#f8fafc",
-                aspectRatio: mapImage ? `${mapWidth} / ${mapHeight}` : "16 / 9",
-                backgroundImage: mapImage
+                bgcolor: is3D ? "transparent" : hasMapAsset ? "#f4f5f7" : "#f8fafc",
+                aspectRatio: hasMapAsset ? `${mapWidth} / ${mapHeight}` : "16 / 9",
+                backgroundImage: hasMapAsset
                   ? "none"
                   : "linear-gradient(135deg, rgba(207, 216, 220, 0.35), rgba(236, 239, 241, 0.9))",
               }}
             >
-              {mapImage ? (
+              {is3D ? (
+                <Box sx={{ width: "100%", height: "100%", position: "relative" }}>
+                  <Map3D
+                    mapVector={mapVector}
+                    selectedId={selectedVectorId}
+                    onSelect={setSelectedVectorId}
+                    showLabels={showLabels}
+                    routePoints={localRoutePoints}
+                  />
+                  {showLabels && selectedVectorId ? (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 12,
+                        left: 12,
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1,
+                        bgcolor: "rgba(15, 23, 42, 0.75)",
+                        color: "#ffffff",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        letterSpacing: 0.3,
+                      }}
+                    >
+                      {`Выбрано: ${selectedVectorId}`}
+                    </Box>
+                  ) : null}
+                </Box>
+              ) : mapImage ? (
                 <Box
                   component="img"
                   src={mapImage.src}
@@ -777,7 +901,7 @@ function MapPageView({
                 </Stack>
               )}
 
-              {routePoints.length >= 2 ? (
+              {!is3D && routePoints.length >= 2 ? (
                 <Box
                   component="svg"
                   viewBox="0 0 100 100"
@@ -818,7 +942,7 @@ function MapPageView({
                 </Box>
               ) : null}
 
-              {places.map((place) => {
+              {!is3D && places.map((place) => {
                 const isSelected = place.id === selectedPlaceId;
                 const isRouteFrom = place.id === routeFromPlaceId;
                 const isRouteTo = place.id === routeToPlaceId;
@@ -855,7 +979,7 @@ function MapPageView({
                 );
               })}
 
-              {selectedPlace ? (
+              {!is3D && selectedPlace ? (
                 <Box
                   sx={{
                     position: "absolute",

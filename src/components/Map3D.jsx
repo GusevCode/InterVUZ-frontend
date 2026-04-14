@@ -68,14 +68,21 @@ function parseNumber(value, fallback = null) {
 }
 
 function CameraRig({ width, height }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
 
   useEffect(() => {
+    const aspect = size.width / size.height;
+    const fovRad = camera.fov * (Math.PI / 180);
+    const fitDist = Math.max(
+      (height / 2) / Math.tan(fovRad / 2),
+      (width / 2) / Math.tan(fovRad / 2) / aspect,
+    );
+
     camera.up.set(0, 0, 1);
-    camera.position.set(0, 0, Math.max(width, height) * 1.1);
+    camera.position.set(0, 0, fitDist * 1.05);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
-  }, [camera, width, height]);
+  }, [camera, width, height, size]);
 
   return null;
 }
@@ -212,7 +219,8 @@ export default function Map3D({
     shapes.flatMap((item) => {
       const id = item.element?.id ?? null;
       const isRoom = typeof id === "string" && id.toLowerCase().startsWith("room");
-      const label = item.element?.title || item.element?.label || id;
+      const rawLabel = item.element?.title || item.element?.label || id;
+      const label = typeof rawLabel === "string" ? rawLabel.replace(/^room-?/i, "") : rawLabel;
       if (!isRoom || !label) {
         return [];
       }
@@ -301,7 +309,7 @@ export default function Map3D({
     <Canvas
       shadows
       gl={{ alpha: true, antialias: true }}
-      camera={{ position: [0, 0, Math.max(width, height)], near: 1, far: 10000 }}
+      camera={{ position: [0, 0, Math.max(width, height) * 0.6], near: 1, far: 10000 }}
       style={{ width: "100%", height: "100%" }}
     >
       <CameraRig width={width} height={height} />
@@ -418,8 +426,8 @@ export default function Map3D({
         zoomSpeed={0.9}
         minPolarAngle={0}
         maxPolarAngle={Math.PI / 4}
-        minDistance={Math.max(width, height) * 0.3}
-        maxDistance={Math.max(width, height) * 2}
+        minDistance={Math.max(width, height) * 0.1}
+        maxDistance={Math.max(width, height) * 3}
       />
     </Canvas>
   );

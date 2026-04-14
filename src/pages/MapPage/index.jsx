@@ -3,6 +3,8 @@ import {
   buildRoute,
   getAvailableFloors,
   getMapImage,
+  getMapVectors,
+  getMapGraphs,
   getPlaces,
 } from "../../entities/map/mapLib";
 import MapPageView from "./MapPageView";
@@ -43,16 +45,30 @@ function getRoutePointCoordinates(point, mapWidth, mapHeight) {
   };
 }
 
+function getMapBaseName(fileName = "") {
+  return String(fileName)
+    .replace(/\.map\.json$/i, "")
+    .replace(/\.graph\.json$/i, "");
+}
+
 function MapPage() {
   const [floors, setFloors] = useState([]);
   const [selectedFloorId, setSelectedFloorId] = useState("");
   const [mapImage, setMapImage] = useState(null);
+  const [mapVector, setMapVector] = useState(null);
+  const [mapVectors, setMapVectors] = useState([]);
+  const [selectedMapId, setSelectedMapId] = useState("");
+  const [mapGraphs, setMapGraphs] = useState([]);
+  const [mapGraph, setMapGraph] = useState(null);
   const [places, setPlaces] = useState([]);
   const [selectedPlaceId, setSelectedPlaceId] = useState("");
   const [routeFromPlaceId, setRouteFromPlaceId] = useState("");
   const [routeToPlaceId, setRouteToPlaceId] = useState("");
   const [accessibleOnly, setAccessibleOnly] = useState(false);
   const [route, setRoute] = useState(null);
+  const [selectedVectorId, setSelectedVectorId] = useState("");
+  const [showLabels, setShowLabels] = useState(true);
+  const [localRoutePoints, setLocalRoutePoints] = useState([]);
   const [routeError, setRouteError] = useState("");
   const [isLoadingFloors, setIsLoadingFloors] = useState(true);
   const [isLoadingMap, setIsLoadingMap] = useState(false);
@@ -62,6 +78,59 @@ function MapPage() {
 
   useEffect(() => {
     let isMounted = true;
+
+    async function loadMapAssets() {
+      setIsLoadingMap(true);
+      setMapWarning("");
+
+      try {
+        const [image, vectors, graphs] = await Promise.all([
+          getMapImage(),
+          getMapVectors(),
+          getMapGraphs(),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setMapImage(image);
+        setMapVectors(vectors);
+        setMapGraphs(graphs);
+
+        const fallbackId = vectors[0]?.id || graphs[0]?.id || "";
+        const initialMapId = fallbackId;
+        const baseName = getMapBaseName(initialMapId);
+        const nextVector = vectors.find((item) => getMapBaseName(item.id) === baseName) || null;
+        const nextGraph = graphs.find((item) => getMapBaseName(item.id) === baseName) || null;
+
+        setSelectedMapId((currentValue) => currentValue || initialMapId);
+        setMapVector(nextVector);
+        setMapGraph(nextGraph);
+        setLocalRoutePoints([]);
+
+        if (!image && !nextVector) {
+          setMapWarning("В `src/entities/map/assets` не найден файл схемы. Добавьте туда PNG/JPG/SVG или *.map.json.");
+        }
+      } catch (loadError) {
+        if (!isMounted) {
+          return;
+        }
+
+        setMapImage(null);
+        setMapVector(null);
+        setMapVectors([]);
+        setMapGraphs([]);
+        setSelectedMapId("");
+        setMapGraph(null);
+        setMapWarning(loadError.message || "Не удалось загрузить схему.");
+        setLocalRoutePoints([]);
+      } finally {
+        if (isMounted) {
+          setIsLoadingMap(false);
+        }
+      }
+    }
 
     async function loadFloors() {
       setIsLoadingFloors(true);
@@ -89,12 +158,55 @@ function MapPage() {
       }
     }
 
+    loadMapAssets();
     loadFloors();
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedMapId) {
+      return;
+    }
+
+    const baseName = getMapBaseName(selectedMapId);
+    const nextVector = mapVectors.find((item) => getMapBaseName(item.id) === baseName) || null;
+    const nextGraph = mapGraphs.find((item) => getMapBaseName(item.id) === baseName) || null;
+
+    setMapVector(nextVector);
+    setMapGraph(nextGraph);
+    setSelectedVectorId("");
+    setLocalRoutePoints([]);
+  }, [selectedMapId, mapVectors, mapGraphs]);
+
+  useEffect(() => {
+    if (!selectedPlaceId || !mapVector) {
+      return;
+    }
+
+    const place = places.find((p) => p.id === selectedPlaceId);
+
+    if (!place) {
+      setSelectedVectorId("");
+      return;
+    }
+
+    const match = place.name.match(/(\d+[а-яёa-z]*)$/i);
+
+    if (!match) {
+      setSelectedVectorId("");
+      return;
+    }
+
+    const cyrillicToLatin = { "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e" };
+    const roomCode = match[1].toLowerCase().replace(/[а-яё]/g, (ch) => cyrillicToLatin[ch] ?? ch);
+    const vectorId = `room-${roomCode}`;
+    const elementExists = (mapVector.elements ?? []).some((el) => el.id === vectorId);
+
+    setSelectedVectorId(elementExists ? vectorId : "");
+  }, [selectedPlaceId, places, mapVector]);
 
   useEffect(() => {
     if (!selectedFloorId) {
@@ -108,21 +220,17 @@ function MapPage() {
       return undefined;
     }
 
-    async function loadMapData() {
+    async function loadPlacesForFloor() {
       setIsLoadingMap(true);
       setError("");
-      setMapWarning("");
       setRoute(null);
       setRouteError("");
 
       try {
-        const [placesResponse, image] = await Promise.all([
-          getPlaces({
-            building: selectedFloor.building,
-            floor: selectedFloor.floor,
-          }),
-          getMapImage(),
-        ]);
+        const placesResponse = await getPlaces({
+          building: selectedFloor.building,
+          floor: selectedFloor.floor,
+        });
 
         if (!isMounted) {
           return;
@@ -136,17 +244,11 @@ function MapPage() {
         setSelectedPlaceId(nextPlaces[0]?.id || "");
         setRouteFromPlaceId(nextFromPlaceId);
         setRouteToPlaceId(nextToPlaceId);
-        setMapImage(image);
-
-        if (!image) {
-          setMapWarning("В `src/data` не найден файл схемы. Добавьте туда PNG, JPG, WEBP, GIF, AVIF или SVG.");
-        }
       } catch (loadError) {
         if (!isMounted) {
           return;
         }
 
-        setMapImage(null);
         setPlaces([]);
         setSelectedPlaceId("");
         setRouteFromPlaceId("");
@@ -159,7 +261,7 @@ function MapPage() {
       }
     }
 
-    loadMapData();
+    loadPlacesForFloor();
 
     return () => {
       isMounted = false;
@@ -171,8 +273,10 @@ function MapPage() {
   const routeFromPlace = places.find((place) => place.id === routeFromPlaceId) || null;
   const routeToPlace = places.find((place) => place.id === routeToPlaceId) || null;
   const isLoading = isLoadingFloors || isLoadingMap;
-  const mapWidth = mapImage?.width || 100;
-  const mapHeight = mapImage?.height || 100;
+  const mapWidth = mapVector?.width || mapImage?.width || 100;
+  const mapHeight = mapVector?.height || mapImage?.height || 100;
+  const hasMapAsset = Boolean(mapImage || mapVector);
+  const is3D = Boolean(mapVector);
   const isRouteDisabled = !routeFromPlaceId || !routeToPlaceId || routeFromPlaceId === routeToPlaceId || isBuildingRoute;
   const routePoints = (route?.steps ?? []).filter((step) => {
     if (!selectedFloor) {
@@ -224,6 +328,8 @@ function MapPage() {
       setRouteFromPlaceId={setRouteFromPlaceId}
       routeToPlaceId={routeToPlaceId}
       setRouteToPlaceId={setRouteToPlaceId}
+      accessibleOnly={accessibleOnly}
+      setAccessibleOnly={setAccessibleOnly}
       handleBuildRoute={handleBuildRoute}
       isRouteDisabled={isRouteDisabled}
       isBuildingRoute={isBuildingRoute}
@@ -239,8 +345,21 @@ function MapPage() {
       selectedPlace={selectedPlace}
       formatPlaceType={formatPlaceType}
       mapImage={mapImage}
+      mapVector={mapVector}
+      mapVectors={mapVectors}
+      selectedMapId={selectedMapId}
+      setSelectedMapId={setSelectedMapId}
+      mapGraph={mapGraph}
+      selectedVectorId={selectedVectorId}
+      setSelectedVectorId={setSelectedVectorId}
+      showLabels={showLabels}
+      setShowLabels={setShowLabels}
+      localRoutePoints={localRoutePoints}
+      setLocalRoutePoints={setLocalRoutePoints}
       mapWidth={mapWidth}
       mapHeight={mapHeight}
+      hasMapAsset={hasMapAsset}
+      is3D={is3D}
       routePoints={routePoints}
       routePolylinePoints={routePolylinePoints}
       getCoordinatePercent={getCoordinatePercent}

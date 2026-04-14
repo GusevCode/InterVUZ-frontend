@@ -4,11 +4,11 @@ const localMapModules = import.meta.glob("./assets/*.{png,jpg,jpeg,webp,avif,gif
   eager: true,
   import: "default",
 });
-const localMapVectorModules = import.meta.glob("../data/*.map.json", {
+const localMapVectorModules = import.meta.glob("./assets/*.map.json", {
   eager: true,
   import: "default",
 });
-const localMapGraphModules = import.meta.glob("../data/*.graph.json", {
+const localMapGraphModules = import.meta.glob("./assets/*.graph.json", {
   eager: true,
   import: "default",
 });
