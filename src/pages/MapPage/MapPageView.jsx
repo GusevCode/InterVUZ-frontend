@@ -5,37 +5,18 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
-import Switch from "@mui/material/Switch";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Map3D from "../../components/Map3D";
 import MapRoutePlanner from "../../components/MapRoutePlanner";
 
 const M = {
-  sectionBg: "linear-gradient(180deg, rgba(24, 40, 66, 0.58) 0%, rgba(18, 31, 53, 0.95) 100%), #121F35",
-  sectionBorder: "#253654",
-  mapAreaBorder: "#3D5683",
-  inputBg: "#101D31",
-  inputBorder: "#355180",
   labelColor: "#AFBFDE",
-  headingColor: "#ECF2FF",
-  bodyColor: "#96A7C9",
-  inputColor: "#E4EDFF",
-  primaryBtnBg: "#2A6DF0",
-  primaryBtnBorder: "#5F8EE5",
-  primaryBtnText: "#F3F7FF",
-  routeNodeBg: "#3D5683",
-  routeFromColor: "#FFD7E0",
-  routeArrowColor: "#8FA4C9",
 };
 
 function MobileMapView({
@@ -43,17 +24,6 @@ function MobileMapView({
   selectedFloorId,
   setSelectedFloorId,
   places,
-  routeFromPlaceId,
-  setRouteFromPlaceId,
-  routeToPlaceId,
-  setRouteToPlaceId,
-  handleBuildRoute,
-  isRouteDisabled,
-  isBuildingRoute,
-  routeError,
-  route,
-  routeFromPlace,
-  routeToPlace,
   isLoading,
   error,
   mapWarning,
@@ -73,6 +43,10 @@ function MobileMapView({
   getRoutePointCoordinates,
   selectedPlaceId,
   setSelectedPlaceId,
+  mapGraph,
+  setLocalRoutePoints,
+  routeFromPlaceId,
+  routeToPlaceId,
 }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -258,253 +232,19 @@ function MobileMapView({
       {/* Route section */}
       <Box
         sx={{
-          background: M.sectionBg,
-          border: `1px solid ${M.sectionBorder}`,
+          background: "linear-gradient(180deg, rgba(24, 40, 66, 0.58) 0%, rgba(18, 31, 53, 0.95) 100%), #121F35",
+          border: "1px solid #253654",
           borderRadius: "18px",
           p: "15px",
           boxShadow: "0px 10px 28px rgba(6, 10, 22, 0.33)",
         }}
       >
-        <Typography
-          sx={{
-            fontFamily: "'Manrope', sans-serif",
-            fontWeight: 800,
-            fontSize: "16px",
-            lineHeight: "22px",
-            color: M.headingColor,
-            mb: "18px",
-          }}
-        >
-          Выбор места
-        </Typography>
-
-        {/* From */}
-        <Box sx={{ mb: "12px" }}>
-          <Typography
-            sx={{
-              fontFamily: "'Manrope', sans-serif",
-              fontWeight: 700,
-              fontSize: "13.3px",
-              lineHeight: "18px",
-              letterSpacing: "0.531px",
-              textTransform: "uppercase",
-              color: M.labelColor,
-              mb: "8px",
-            }}
-          >
-            Откуда
-          </Typography>
-          <Box
-            sx={{
-              background: M.inputBg,
-              border: `1px solid ${M.inputBorder}`,
-              borderRadius: "12px",
-              height: "46px",
-              display: "flex",
-              alignItems: "center",
-              px: "15px",
-            }}
-          >
-            <Select
-              size="small"
-              value={routeFromPlaceId}
-              onChange={(e) => setRouteFromPlaceId(e.target.value)}
-              variant="standard"
-              disableUnderline
-              fullWidth
-              disabled={places.length === 0}
-              sx={{
-                fontFamily: "'Manrope', sans-serif",
-                fontWeight: 400,
-                fontSize: "14.7px",
-                color: M.inputColor,
-                "& .MuiSelect-icon": { color: M.inputColor },
-                "& .MuiSelect-select": { p: 0 },
-              }}
-            >
-              {places.map((place) => (
-                <MenuItem key={place.id} value={place.id}>{place.name}</MenuItem>
-              ))}
-            </Select>
-          </Box>
-        </Box>
-
-        {/* To */}
-        <Box sx={{ mb: "18px" }}>
-          <Typography
-            sx={{
-              fontFamily: "'Manrope', sans-serif",
-              fontWeight: 700,
-              fontSize: "13.3px",
-              lineHeight: "18px",
-              letterSpacing: "0.531px",
-              textTransform: "uppercase",
-              color: M.labelColor,
-              mb: "8px",
-            }}
-          >
-            Куда
-          </Typography>
-          <Box
-            sx={{
-              background: M.inputBg,
-              border: `1px solid ${M.inputBorder}`,
-              borderRadius: "12px",
-              height: "46px",
-              display: "flex",
-              alignItems: "center",
-              px: "15px",
-            }}
-          >
-            <Select
-              size="small"
-              value={routeToPlaceId}
-              onChange={(e) => setRouteToPlaceId(e.target.value)}
-              variant="standard"
-              disableUnderline
-              fullWidth
-              disabled={places.length === 0}
-              sx={{
-                fontFamily: "'Manrope', sans-serif",
-                fontWeight: 400,
-                fontSize: "14.7px",
-                color: M.inputColor,
-                "& .MuiSelect-icon": { color: M.inputColor },
-                "& .MuiSelect-select": { p: 0 },
-              }}
-            >
-              {places.map((place) => (
-                <MenuItem key={place.id} value={place.id}>{place.name}</MenuItem>
-              ))}
-            </Select>
-          </Box>
-        </Box>
-
-        {/* Build route button */}
-        <Box
-          component="button"
-          onClick={handleBuildRoute}
-          disabled={isRouteDisabled}
-          sx={{
-            width: "100%",
-            height: "40px",
-            background: isRouteDisabled ? "rgba(42, 109, 240, 0.5)" : M.primaryBtnBg,
-            border: `1px solid ${M.primaryBtnBorder}`,
-            borderRadius: "12px",
-            cursor: isRouteDisabled ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: isRouteDisabled ? 0.7 : 1,
-          }}
-        >
-          <Typography
-            sx={{
-              fontFamily: "'Arial', sans-serif",
-              fontWeight: 700,
-              fontSize: "14.4px",
-              lineHeight: "17px",
-              color: M.primaryBtnText,
-            }}
-          >
-            {isBuildingRoute ? "Строим маршрут…" : "Построить маршрут"}
-          </Typography>
-        </Box>
-
-        {routeError ? (
-          <Typography
-            sx={{
-              fontFamily: "'Manrope', sans-serif",
-              fontSize: "13px",
-              color: "#ff6b6b",
-              mt: "10px",
-            }}
-          >
-            {routeError}
-          </Typography>
-        ) : null}
+        <MapRoutePlanner
+          graph={mapGraph}
+          onRouteChange={setLocalRoutePoints}
+          dark
+        />
       </Box>
-
-      {/* Route result */}
-      {route ? (
-        <Box
-          sx={{
-            background: M.sectionBg,
-            border: `1px solid ${M.sectionBorder}`,
-            borderRadius: "18px",
-            p: "15px",
-            boxShadow: "0px 10px 28px rgba(6, 10, 22, 0.33)",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            <Typography
-              sx={{
-                fontFamily: "'Manrope', sans-serif",
-                fontWeight: 600,
-                fontSize: "13.4px",
-                lineHeight: "18px",
-                color: M.routeFromColor,
-              }}
-            >
-              {routeFromPlace?.name ?? routeFromPlaceId}
-            </Typography>
-            <Typography
-              sx={{
-                fontFamily: "'Manrope', sans-serif",
-                fontWeight: 400,
-                fontSize: "16px",
-                color: M.routeArrowColor,
-              }}
-            >
-              →
-            </Typography>
-            <Typography
-              sx={{
-                fontFamily: "'Manrope', sans-serif",
-                fontWeight: 600,
-                fontSize: "13.4px",
-                lineHeight: "18px",
-                color: M.routeFromColor,
-              }}
-            >
-              {routeToPlace?.name ?? routeToPlaceId}
-            </Typography>
-          </Box>
-
-          {route.steps.length > 0 ? (
-            <Stack spacing={1} sx={{ mt: "12px" }}>
-              {route.steps.map((step) => (
-                <Box
-                  key={`${step.order}-${step.placeId || step.instruction}`}
-                  sx={{ display: "flex", alignItems: "flex-start", gap: "10px" }}
-                >
-                  <Box
-                    sx={{
-                      width: "16px",
-                      height: "16px",
-                      borderRadius: "50%",
-                      bgcolor: M.routeNodeBg,
-                      flexShrink: 0,
-                      mt: "2px",
-                    }}
-                  />
-                  <Typography
-                    sx={{
-                      fontFamily: "'Manrope', sans-serif",
-                      fontWeight: 600,
-                      fontSize: "13.4px",
-                      lineHeight: "18px",
-                      color: M.routeFromColor,
-                    }}
-                  >
-                    {step.instruction}
-                  </Typography>
-                </Box>
-              ))}
-            </Stack>
-          ) : null}
-        </Box>
-      ) : null}
 
       {mapWarning ? (
         <Typography
@@ -577,16 +317,7 @@ function MapPageView({
         setSelectedFloorId={setSelectedFloorId}
         places={places}
         routeFromPlaceId={routeFromPlaceId}
-        setRouteFromPlaceId={setRouteFromPlaceId}
         routeToPlaceId={routeToPlaceId}
-        setRouteToPlaceId={setRouteToPlaceId}
-        handleBuildRoute={handleBuildRoute}
-        isRouteDisabled={isRouteDisabled}
-        isBuildingRoute={isBuildingRoute}
-        routeError={routeError}
-        route={route}
-        routeFromPlace={routeFromPlace}
-        routeToPlace={routeToPlace}
         isLoading={isLoading}
         error={error}
         mapWarning={mapWarning}
@@ -606,6 +337,8 @@ function MapPageView({
         getRoutePointCoordinates={getRoutePointCoordinates}
         selectedPlaceId={selectedPlaceId}
         setSelectedPlaceId={setSelectedPlaceId}
+        mapGraph={mapGraph}
+        setLocalRoutePoints={setLocalRoutePoints}
       />
     );
   }
@@ -670,102 +403,10 @@ function MapPageView({
 
               <Divider />
 
-              <Stack spacing={1.5}>
-                <Typography variant="subtitle2">Маршрут</Typography>
-                <TextField
-                  select
-                  size="small"
-                  label="Откуда"
-                  value={routeFromPlaceId}
-                  onChange={(event) => setRouteFromPlaceId(event.target.value)}
-                  disabled={places.length === 0}
-                >
-                  {places.map((place) => (
-                    <MenuItem key={place.id} value={place.id}>
-                      {place.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  select
-                  size="small"
-                  label="Куда"
-                  value={routeToPlaceId}
-                  onChange={(event) => setRouteToPlaceId(event.target.value)}
-                  disabled={places.length === 0}
-                >
-                  {places.map((place) => (
-                    <MenuItem key={place.id} value={place.id}>
-                      {place.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <Box
-                  component="button"
-                  onClick={handleBuildRoute}
-                  disabled={isRouteDisabled}
-                  sx={{
-                    width: "100%",
-                    height: "40px",
-                    background: isRouteDisabled ? "rgba(42, 109, 240, 0.5)" : M.primaryBtnBg,
-                    border: "1px solid " + M.primaryBtnBorder,
-                    borderRadius: "12px",
-                    cursor: isRouteDisabled ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "'Arial', sans-serif",
-                    fontWeight: 700,
-                    fontSize: "14.4px",
-                    lineHeight: "17px",
-                    color: M.primaryBtnText,
-                    opacity: isRouteDisabled ? 0.7 : 1,
-                  }}
-                >
-                  {isBuildingRoute ? "Строим маршрут..." : "Построить маршрут"}
-                </Box>
-                {is3D ? (
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={showLabels}
-                        onChange={(event) => setShowLabels(event.target.checked)}
-                        size="small"
-                      />
-                    }
-                    label="Подписи на карте"
-                  />
-                ) : null}
-                {routeError ? <Alert severity="error">{routeError}</Alert> : null}
-                <MapRoutePlanner
-                  graph={mapGraph}
-                  onRouteChange={setLocalRoutePoints}
-                />
-                {route ? (
-                  <Card variant="outlined">
-                    <CardContent sx={{ p: 2 }}>
-                      <Stack spacing={1.5}>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                          <Chip label={`От: ${routeFromPlace?.name ?? routeFromPlaceId}`} size="small" />
-                          <Chip label={`До: ${routeToPlace?.name ?? routeToPlaceId}`} size="small" />
-                        </Stack>
-                        {route.steps.length > 0 ? (
-                          <List sx={{ p: 0 }}>
-                            {route.steps.map((step) => (
-                              <ListItemText
-                                key={`${step.order}-${step.placeId || step.instruction}`}
-                                primary={`${step.order}. ${step.instruction}`}
-                                secondary={`x:${step.coordinates.x}, y:${step.coordinates.y}`}
-                                sx={{ py: 0.5 }}
-                              />
-                            ))}
-                          </List>
-                        ) : null}
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                ) : null}
-              </Stack>
+              <MapRoutePlanner
+                graph={mapGraph}
+                onRouteChange={setLocalRoutePoints}
+              />
 
               <Divider />
 

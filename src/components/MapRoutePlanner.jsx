@@ -151,7 +151,19 @@ function findShortestPath(graph, fromId, toId) {
   return path;
 }
 
-export default function MapRoutePlanner({ graph, onRouteChange }) {
+const D = {
+  bg: "linear-gradient(180deg, rgba(24, 40, 66, 0.58) 0%, rgba(18, 31, 53, 0.95) 100%), #121F35",
+  border: "#253654",
+  inputBg: "#101D31",
+  inputBorder: "#355180",
+  labelColor: "#AFBFDE",
+  inputColor: "#E4EDFF",
+  btnBg: "rgba(18, 31, 53, 0.8)",
+  btnBorder: "#334B71",
+  btnText: "#C3D7FF",
+};
+
+export default function MapRoutePlanner({ graph, onRouteChange, dark = false }) {
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [error, setError] = useState("");
@@ -234,15 +246,36 @@ export default function MapRoutePlanner({ graph, onRouteChange }) {
     );
   }
 
+  const inputSx = dark
+    ? {
+        "& .MuiOutlinedInput-root": {
+          background: D.inputBg,
+          "& fieldset": { borderColor: D.inputBorder },
+          "&:hover fieldset": { borderColor: "#4d75b0" },
+          "&.Mui-focused fieldset": { borderColor: "#5a8fd4" },
+        },
+        "& .MuiInputBase-input": { color: D.inputColor },
+        "& .MuiInputLabel-root": { color: D.labelColor },
+        "& .MuiInputLabel-root.Mui-focused": { color: "#7ab0f0" },
+        "& .MuiSelect-icon": { color: D.labelColor },
+      }
+    : {};
+
   return (
     <Stack spacing={1.5}>
-      <Typography variant="subtitle2">Маршрут по разметке</Typography>
+      <Typography
+        variant="subtitle2"
+        sx={dark ? { color: D.labelColor, fontFamily: "'Manrope', sans-serif", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", fontSize: "13px" } : {}}
+      >
+        Маршрут по разметке
+      </Typography>
       <TextField
         select
         size="small"
         label="Откуда"
         value={fromId}
         onChange={(event) => setFromId(event.target.value)}
+        sx={inputSx}
       >
         {nodes.map((node) => (
           <MenuItem key={node.id} value={node.id}>
@@ -256,6 +289,7 @@ export default function MapRoutePlanner({ graph, onRouteChange }) {
         label="Куда"
         value={toId}
         onChange={(event) => setToId(event.target.value)}
+        sx={inputSx}
       >
         {nodes.map((node) => (
           <MenuItem key={node.id} value={node.id}>
@@ -263,11 +297,29 @@ export default function MapRoutePlanner({ graph, onRouteChange }) {
           </MenuItem>
         ))}
       </TextField>
-      <Button variant="outlined" onClick={handleBuildRoute}>
+      <Button
+        variant="outlined"
+        onClick={handleBuildRoute}
+        sx={
+          dark
+            ? {
+                background: D.btnBg,
+                border: `1px solid ${D.btnBorder}`,
+                color: D.btnText,
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 700,
+                fontSize: "14px",
+                borderRadius: "12px",
+                height: "40px",
+                "&:hover": { background: "rgba(28, 48, 82, 0.9)", borderColor: "#4d75b0" },
+              }
+            : {}
+        }
+      >
         Найти кратчайший путь
       </Button>
       {error ? <Alert severity="error">{error}</Alert> : null}
-      <Box sx={{ color: "text.secondary", fontSize: 12 }}>
+      <Box sx={{ color: dark ? D.labelColor : "text.secondary", fontSize: 12 }}>
         Совет: добавьте узлы в *.graph.json и соедините их рёбрами.
       </Box>
     </Stack>
