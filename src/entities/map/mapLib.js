@@ -1,6 +1,6 @@
-﻿const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
+import { fetchJson, postJson } from "../../shared/baseApi";
 
-const localMapModules = import.meta.glob("../data/*.{png,jpg,jpeg,webp,avif,gif,svg}", {
+const localMapModules = import.meta.glob("./assets/*.{png,jpg,jpeg,webp,avif,gif,svg}", {
   eager: true,
   import: "default",
 });
@@ -36,47 +36,6 @@ function readImageSizeFromSrc(src) {
 
     image.src = src;
   });
-}
-
-function buildUrl(path, query = {}) {
-  const rawUrl = `${apiBaseUrl}${path}`;
-  const url = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
-    ? new URL(rawUrl)
-    : new URL(rawUrl, window.location.origin);
-
-  Object.entries(query).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      url.searchParams.set(key, value);
-    }
-  });
-
-  return url;
-}
-
-async function fetchJson(path, query) {
-  const response = await fetch(buildUrl(path, query));
-
-  if (!response.ok) {
-    throw new Error(`Р—Р°РїСЂРѕСЃ ${path} Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РєРѕРґРѕРј ${response.status}.`);
-  }
-
-  return response.json();
-}
-
-async function postJson(path, body) {
-  const response = await fetch(buildUrl(path), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Р—Р°РїСЂРѕСЃ ${path} Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РєРѕРґРѕРј ${response.status}.`);
-  }
-
-  return response.json();
 }
 
 function normalizeBuilding(building) {
