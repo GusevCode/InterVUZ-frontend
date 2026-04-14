@@ -1,0 +1,673 @@
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Chip from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
+import Divider from "@mui/material/Divider";
+import Grid from "@mui/material/Grid";
+import List from "@mui/material/List";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemText from "@mui/material/ListItemText";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import Map3D from "../../components/Map3D";
+import MapRoutePlanner from "../../components/MapRoutePlanner";
+
+const M = {
+  labelColor: "#AFBFDE",
+};
+
+function MobileMapView({
+  floors,
+  selectedFloorId,
+  setSelectedFloorId,
+  places,
+  isLoading,
+  error,
+  mapWarning,
+  mapImage,
+  mapVector,
+  is3D,
+  hasMapAsset,
+  selectedVectorId,
+  setSelectedVectorId,
+  showLabels,
+  localRoutePoints,
+  mapWidth,
+  mapHeight,
+  routePoints,
+  routePolylinePoints,
+  getCoordinatePercent,
+  getRoutePointCoordinates,
+  selectedPlaceId,
+  setSelectedPlaceId,
+  mapGraph,
+  setLocalRoutePoints,
+  routeFromPlaceId,
+  routeToPlaceId,
+}) {
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {/* Map area */}
+      <Box
+        sx={{
+          border: "1px dashed #3D5683",
+          borderRadius: "18px",
+          overflow: "hidden",
+          aspectRatio: hasMapAsset ? `${mapWidth} / ${mapHeight}` : "4 / 3",
+          position: "relative",
+          bgcolor: is3D ? "transparent" : mapImage ? "#0a1222" : "transparent",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "200px",
+        }}
+      >
+        {isLoading ? (
+          <Stack spacing={1} alignItems="center">
+            <CircularProgress size={24} sx={{ color: M.labelColor }} />
+            <Typography
+              sx={{
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 400,
+                fontSize: "14px",
+                color: M.labelColor,
+              }}
+            >
+              Загрузка карты…
+            </Typography>
+          </Stack>
+        ) : is3D ? (
+          <Box sx={{ width: "100%", height: "100%", position: "relative" }}>
+            <Map3D
+              mapVector={mapVector}
+              selectedId={selectedVectorId}
+              onSelect={setSelectedVectorId}
+              showLabels={showLabels}
+              routePoints={localRoutePoints}
+            />
+            {showLabels && selectedVectorId ? (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: 1,
+                  bgcolor: "rgba(15, 23, 42, 0.75)",
+                  color: "#ffffff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                {`Выбрано: ${selectedVectorId}`}
+              </Box>
+            ) : null}
+          </Box>
+        ) : mapImage ? (
+          <>
+            <Box
+              component="img"
+              src={mapImage.src}
+              alt={mapImage.alt}
+              sx={{
+                display: "block",
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                userSelect: "none",
+              }}
+            />
+            {routePoints.length >= 2 ? (
+              <Box
+                component="svg"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  pointerEvents: "none",
+                  overflow: "visible",
+                }}
+              >
+                <polyline
+                  points={routePolylinePoints}
+                  fill="none"
+                  stroke="#0f766e"
+                  strokeWidth="1.1"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {routePoints.map((point, index) => {
+                  const coords = getRoutePointCoordinates(point, mapWidth, mapHeight);
+                  const isEdge = index === 0 || index === routePoints.length - 1;
+                  return (
+                    <circle
+                      key={`${point.order}-${point.placeId || point.instruction}`}
+                      cx={coords.x}
+                      cy={coords.y}
+                      r={isEdge ? 1.8 : 1.3}
+                      fill={isEdge ? "#0f766e" : "#ffffff"}
+                      stroke="#0f766e"
+                      strokeWidth="0.7"
+                    />
+                  );
+                })}
+              </Box>
+            ) : null}
+            {places.map((place) => {
+              const isSelected = place.id === selectedPlaceId;
+              const isFrom = place.id === routeFromPlaceId;
+              const isTo = place.id === routeToPlaceId;
+              return (
+                <Box
+                  key={place.id}
+                  onClick={() => setSelectedPlaceId(place.id)}
+                  title={place.name}
+                  sx={{
+                    position: "absolute",
+                    left: `${getCoordinatePercent(place.coordinates.x, mapWidth)}%`,
+                    top: `${getCoordinatePercent(place.coordinates.y, mapHeight)}%`,
+                    transform: "translate(-50%, -50%)",
+                    width: isSelected || isFrom || isTo ? 18 : 14,
+                    height: isSelected || isFrom || isTo ? 18 : 14,
+                    borderRadius: "50%",
+                    border: "2px solid #ffffff",
+                    bgcolor: isFrom ? "#0f766e" : isTo ? "#2563eb" : isSelected ? "#1f3a5f" : "#d14b4b",
+                    boxShadow: "0 3px 10px rgba(0,0,0,0.4)",
+                    cursor: "pointer",
+                    transition: "all 160ms ease",
+                  }}
+                />
+              );
+            })}
+          </>
+        ) : (
+          <Typography
+            sx={{
+              fontFamily: "'Manrope', sans-serif",
+              fontWeight: 400,
+              fontSize: "14.1px",
+              lineHeight: "19px",
+              color: M.labelColor,
+              textAlign: "center",
+              px: 2,
+            }}
+          >
+            {error
+              ? "Не удалось загрузить карту"
+              : floors.length === 0
+                ? "Выберите этаж для отображения карты"
+                : "Загрузка схемы этажа…"}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Floor chips */}
+      {floors.length > 0 ? (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {floors.map((floor) => (
+            <Chip
+              key={floor.id}
+              label={floor.label}
+              clickable
+              size="small"
+              color={floor.id === selectedFloorId ? "primary" : "default"}
+              variant={floor.id === selectedFloorId ? "filled" : "outlined"}
+              onClick={() => setSelectedFloorId(floor.id)}
+              sx={{
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 600,
+              }}
+            />
+          ))}
+        </Stack>
+      ) : null}
+
+      {/* Route section */}
+      <Box
+        sx={{
+          background: "linear-gradient(180deg, rgba(24, 40, 66, 0.58) 0%, rgba(18, 31, 53, 0.95) 100%), #121F35",
+          border: "1px solid #253654",
+          borderRadius: "18px",
+          p: "15px",
+          boxShadow: "0px 10px 28px rgba(6, 10, 22, 0.33)",
+        }}
+      >
+        <MapRoutePlanner
+          graph={mapGraph}
+          onRouteChange={setLocalRoutePoints}
+          dark
+        />
+      </Box>
+
+      {mapWarning ? (
+        <Typography
+          sx={{
+            fontFamily: "'Manrope', sans-serif",
+            fontSize: "13px",
+            color: "#f5a623",
+            textAlign: "center",
+          }}
+        >
+          {mapWarning}
+        </Typography>
+      ) : null}
+    </Box>
+  );
+}
+
+function MapPageView({
+  floors,
+  selectedFloorId,
+  setSelectedFloorId,
+  selectedFloor,
+  places,
+  routeFromPlaceId,
+  setRouteFromPlaceId,
+  routeToPlaceId,
+  setRouteToPlaceId,
+  handleBuildRoute,
+  isRouteDisabled,
+  isBuildingRoute,
+  routeError,
+  route,
+  routeFromPlace,
+  routeToPlace,
+  isLoading,
+  error,
+  mapWarning,
+  selectedPlaceId,
+  setSelectedPlaceId,
+  selectedPlace,
+  formatPlaceType,
+  mapImage,
+  mapVector,
+  mapVectors,
+  selectedMapId,
+  setSelectedMapId,
+  mapGraph,
+  selectedVectorId,
+  setSelectedVectorId,
+  showLabels,
+  setShowLabels,
+  localRoutePoints,
+  setLocalRoutePoints,
+  mapWidth,
+  mapHeight,
+  hasMapAsset,
+  is3D,
+  routePoints,
+  routePolylinePoints,
+  getCoordinatePercent,
+  getRoutePointCoordinates,
+}) {
+  const isMobile = useMediaQuery("(max-width:600px)");
+
+  if (isMobile) {
+    return (
+      <MobileMapView
+        floors={floors}
+        selectedFloorId={selectedFloorId}
+        setSelectedFloorId={setSelectedFloorId}
+        places={places}
+        routeFromPlaceId={routeFromPlaceId}
+        routeToPlaceId={routeToPlaceId}
+        isLoading={isLoading}
+        error={error}
+        mapWarning={mapWarning}
+        mapImage={mapImage}
+        mapVector={mapVector}
+        is3D={is3D}
+        hasMapAsset={hasMapAsset}
+        selectedVectorId={selectedVectorId}
+        setSelectedVectorId={setSelectedVectorId}
+        showLabels={showLabels}
+        localRoutePoints={localRoutePoints}
+        mapWidth={mapWidth}
+        mapHeight={mapHeight}
+        routePoints={routePoints}
+        routePolylinePoints={routePolylinePoints}
+        getCoordinatePercent={getCoordinatePercent}
+        getRoutePointCoordinates={getRoutePointCoordinates}
+        selectedPlaceId={selectedPlaceId}
+        setSelectedPlaceId={setSelectedPlaceId}
+        mapGraph={mapGraph}
+        setLocalRoutePoints={setLocalRoutePoints}
+      />
+    );
+  }
+
+  return (
+    <Grid container spacing={2}>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <Card sx={{ height: "100%", borderRadius: 2 }}>
+          <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="h4" component="h1" gutterBottom>
+                  Карта корпуса
+                </Typography>
+              </Box>
+
+              {mapVectors.length > 0 ? (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Схемы этажей
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {mapVectors.map((vector) => (
+                      <Chip
+                        key={vector.id}
+                        label={vector.label}
+                        clickable
+                        color={vector.id === selectedMapId ? "primary" : "default"}
+                        variant={vector.id === selectedMapId ? "filled" : "outlined"}
+                        onClick={() => setSelectedMapId(vector.id)}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              ) : null}
+
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  Этажи
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {floors.map((floor) => (
+                    <Chip
+                      key={floor.id}
+                      label={floor.label}
+                      clickable
+                      color={floor.id === selectedFloorId ? "primary" : "default"}
+                      variant={floor.id === selectedFloorId ? "filled" : "outlined"}
+                      onClick={() => setSelectedFloorId(floor.id)}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+
+              {selectedFloor ? (
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip label={`Корпус ${selectedFloor.building}`} size="small" />
+                  <Chip label={`Этаж ${selectedFloor.label}`} size="small" />
+                  <Chip label={`Точек: ${places.length}`} size="small" color="primary" variant="outlined" />
+                </Stack>
+              ) : null}
+
+              <Divider />
+
+              <MapRoutePlanner
+                graph={mapGraph}
+                onRouteChange={setLocalRoutePoints}
+              />
+
+              <Divider />
+
+              {isLoading ? (
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <CircularProgress size={20} />
+                  <Typography variant="body2">Загрузка схемы...</Typography>
+                </Stack>
+              ) : null}
+
+              {error ? <Alert severity="error">{error}</Alert> : null}
+              {mapWarning ? <Alert severity="warning">{mapWarning}</Alert> : null}
+
+              {!isLoading && !error && floors.length === 0 ? (
+                <Alert severity="warning">Бэкенд не вернул доступные этажи через `/places`.</Alert>
+              ) : null}
+
+              {!isLoading && !error && places.length > 0 ? (
+                <List sx={{ p: 0 }}>
+                  {places.map((place) => {
+                    const isSelected = place.id === selectedPlaceId;
+
+                    return (
+                      <ListItemButton
+                        key={place.id}
+                        selected={isSelected}
+                        onClick={() => setSelectedPlaceId(place.id)}
+                        sx={{
+                          px: 1,
+                          py: 1.25,
+                          borderRadius: 2,
+                          mb: 0.5,
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        <ListItemText
+                          primary={place.name}
+                          secondary={`${formatPlaceType(place.type)} - x:${place.coordinates.x}, y:${place.coordinates.y}`}
+                          primaryTypographyProps={{ fontWeight: isSelected ? 700 : 500 }}
+                        />
+                      </ListItemButton>
+                    );
+                  })}
+                </List>
+              ) : null}
+
+              {!isLoading && !error && selectedFloor && places.length === 0 ? (
+                <Alert severity="warning">Для выбранного этажа бэкенд не вернул точек.</Alert>
+              ) : null}
+
+              {selectedPlace ? (
+                <Card variant="outlined">
+                  <CardContent sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      {selectedPlace.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                      {selectedPlace.description}
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      <Chip label={formatPlaceType(selectedPlace.type)} size="small" />
+                      <Chip
+                        label={selectedPlace.isAccessible ? "доступно" : "только по лестнице"}
+                        size="small"
+                        color={selectedPlace.isAccessible ? "success" : "default"}
+                        variant="outlined"
+                      />
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid size={{ xs: 12, md: 8 }}>
+        <Card sx={{ borderRadius: "2", overflow: "hidden" }}>
+          <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <Typography variant="h6" gutterBottom>
+              Схема этажа
+            </Typography>
+
+            <Box
+              sx={{
+                position: "relative",
+                width: "100%",
+                borderRadius: 2,
+                overflow: "hidden",
+                border: "1px solid",
+                borderColor: "divider",
+                bgcolor: is3D ? "transparent" : hasMapAsset ? "#f4f5f7" : "#f8fafc",
+                aspectRatio: hasMapAsset ? `${mapWidth} / ${mapHeight}` : "16 / 9",
+                backgroundImage: hasMapAsset
+                  ? "none"
+                  : "linear-gradient(135deg, rgba(207, 216, 220, 0.35), rgba(236, 239, 241, 0.9))",
+              }}
+            >
+              {is3D ? (
+                <Box sx={{ width: "100%", height: "100%", position: "relative" }}>
+                  <Map3D
+                    mapVector={mapVector}
+                    selectedId={selectedVectorId}
+                    onSelect={setSelectedVectorId}
+                    showLabels={showLabels}
+                    routePoints={localRoutePoints}
+                  />
+                  {showLabels && selectedVectorId ? (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 12,
+                        left: 12,
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1,
+                        bgcolor: "rgba(15, 23, 42, 0.75)",
+                        color: "#ffffff",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        letterSpacing: 0.3,
+                      }}
+                    >
+                      {`Выбрано: ${selectedVectorId}`}
+                    </Box>
+                  ) : null}
+                </Box>
+              ) : mapImage ? (
+                <Box
+                  component="img"
+                  src={mapImage.src}
+                  alt={mapImage.alt}
+                  sx={{
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    userSelect: "none",
+                  }}
+                />
+              ) : (
+                <Stack
+                  spacing={1}
+                  alignItems="center"
+                  justifyContent="center"
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    px: 2,
+                    textAlign: "center",
+                    color: "text.secondary",
+                  }}
+                >
+                  <Typography variant="subtitle1">загрузка схемы</Typography>
+                </Stack>
+              )}
+
+              {!is3D && routePoints.length >= 2 ? (
+                <Box
+                  component="svg"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    pointerEvents: "none",
+                    overflow: "visible",
+                  }}
+                >
+                  <polyline
+                    points={routePolylinePoints}
+                    fill="none"
+                    stroke="#0f766e"
+                    strokeWidth="1.1"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  {routePoints.map((point, index) => {
+                    const coordinates = getRoutePointCoordinates(point, mapWidth, mapHeight);
+                    const isEdgePoint = index === 0 || index === routePoints.length - 1;
+
+                    return (
+                      <circle
+                        key={`${point.order}-${point.placeId || point.instruction}`}
+                        cx={coordinates.x}
+                        cy={coordinates.y}
+                        r={isEdgePoint ? 1.8 : 1.3}
+                        fill={isEdgePoint ? "#0f766e" : "#ffffff"}
+                        stroke="#0f766e"
+                        strokeWidth="0.7"
+                      />
+                    );
+                  })}
+                </Box>
+              ) : null}
+
+              {!is3D && places.map((place) => {
+                const isSelected = place.id === selectedPlaceId;
+                const isRouteFrom = place.id === routeFromPlaceId;
+                const isRouteTo = place.id === routeToPlaceId;
+                const left = `${getCoordinatePercent(place.coordinates.x, mapWidth)}%`;
+                const top = `${getCoordinatePercent(place.coordinates.y, mapHeight)}%`;
+                const backgroundColor = isRouteFrom
+                  ? "#0f766e"
+                  : isRouteTo
+                    ? "#2563eb"
+                    : isSelected
+                      ? "#1f3a5f"
+                      : "#d14b4b";
+
+                return (
+                  <Box
+                    key={place.id}
+                    onClick={() => setSelectedPlaceId(place.id)}
+                    title={place.name}
+                    sx={{
+                      position: "absolute",
+                      left,
+                      top,
+                      transform: "translate(-50%, -50%)",
+                      width: isSelected || isRouteFrom || isRouteTo ? 22 : 18,
+                      height: isSelected || isRouteFrom || isRouteTo ? 22 : 18,
+                      borderRadius: "50%",
+                      border: "3px solid #ffffff",
+                      bgcolor: backgroundColor,
+                      boxShadow: "0 4px 14px rgba(22, 33, 48, 0.24)",
+                      cursor: "pointer",
+                      transition: "all 160ms ease",
+                    }}
+                  />
+                );
+              })}
+
+              {!is3D && selectedPlace ? (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: `${getCoordinatePercent(selectedPlace.coordinates.x, mapWidth)}%`,
+                    top: `calc(${getCoordinatePercent(selectedPlace.coordinates.y, mapHeight)}% - 22px)`,
+                    transform: "translate(-50%, -100%)",
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: 1.5,
+                    bgcolor: "rgba(31, 58, 95, 0.92)",
+                    color: "#ffffff",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {selectedPlace.name}
+                </Box>
+              ) : null}
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
+  );
+}
+
+export default MapPageView;
