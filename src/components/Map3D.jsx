@@ -4,6 +4,18 @@ import { Html, OrbitControls } from "@react-three/drei";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import * as THREE from "three";
 
+const MAP_PALETTE = {
+  base: "#e7dfd3",
+  room: "#d6c4a8",
+  accent: "#b08968",
+  stroke: "#5b4b3a",
+  outline: "#3f2f21",
+  hover: "#f59e0b",
+  selected: "#22c55e",
+  label: "rgba(47, 36, 26, 0.78)",
+  labelElevated: "rgba(47, 36, 26, 0.9)",
+};
+
 function buildSvgText(mapVector) {
   const viewBox = Array.isArray(mapVector?.viewBox) ? mapVector.viewBox : [0, 0, mapVector?.width ?? 100, mapVector?.height ?? 100];
   const paths = (mapVector?.elements ?? [])
@@ -92,6 +104,7 @@ export default function Map3D({
   selectedId,
   onSelect,
   showLabels = true,
+  onInteract,
   routePoints = [],
 }) {
   const [hoveredId, setHoveredId] = useState(null);
@@ -125,13 +138,14 @@ export default function Map3D({
 
   const fillMeshes = useMemo(() => (
     shapes.flatMap((item) => {
-      const fill = item.style.fill ?? "#cbd5e1";
+      const fill = item.style.fill ?? MAP_PALETTE.base;
       if (!fill || fill === "none") {
         return [];
       }
 
       const id = item.element?.id ?? null;
       const isRoom = typeof id === "string" && id.toLowerCase().startsWith("room");
+      const color = isRoom ? MAP_PALETTE.room : MAP_PALETTE.base;
       const depth = isRoom ? roomDepth : baseDepth;
       const geometry = new THREE.ExtrudeGeometry(item.shape, {
         depth,
@@ -141,7 +155,7 @@ export default function Map3D({
       return [{
         key: `f-${item.key}-${fill}`,
         geometry,
-        color: fill,
+        color,
         opacity: getOpacity(item.style),
         id,
         depth,
@@ -177,7 +191,7 @@ export default function Map3D({
         return [{
           key: `s-${pathIndex}-${subIndex}`,
           geometry,
-          color: stroke,
+          color: MAP_PALETTE.stroke,
           opacity: getStrokeOpacity(style),
           id,
         }];
@@ -206,9 +220,12 @@ export default function Map3D({
     if (!Array.isArray(routePoints) || routePoints.length < 2) {
       return null;
     }
-    const points = routePoints.map((point) => new THREE.Vector3(point.x, point.y, roomDepth + 10));
-    return new THREE.BufferGeometry().setFromPoints(points);
-  }, [routePoints, roomDepth]);
+    const routeZ = baseDepth + 2;
+    const pathPoints = routePoints.map((point) => new THREE.Vector3(point.x, point.y, routeZ));
+    const curve = new THREE.CatmullRomCurve3(pathPoints, false, "centripetal");
+    const segments = Math.max(16, pathPoints.length * 6);
+    return new THREE.TubeGeometry(curve, segments, 2.2, 14, false);
+  }, [routePoints, baseDepth]);
 
   const meshes = useMemo(
     () => [...fillMeshes, ...strokeMeshes, ...outlineMeshes].concat(routeGeometry ? [{ geometry: routeGeometry }] : []),
@@ -336,7 +353,7 @@ export default function Map3D({
         {fillMeshes.map((mesh) => {
           const isSelected = mesh.id && mesh.id === selectedId;
           const isHovered = mesh.id && mesh.id === hoveredId;
-          const tint = isSelected ? "#22c55e" : isHovered ? "#38bdf8" : mesh.color;
+          const tint = isSelected ? MAP_PALETTE.selected : isHovered ? MAP_PALETTE.hover : mesh.color;
           return (
             <mesh
               key={mesh.key}
@@ -379,7 +396,7 @@ export default function Map3D({
         {outlineMeshes.map((mesh) => {
           const isSelected = mesh.id && mesh.id === selectedId;
           const isHovered = mesh.id && mesh.id === hoveredId;
-          const color = isSelected ? "#16a34a" : isHovered ? "#0284c7" : "#0f172a";
+          const color = isSelected ? MAP_PALETTE.selected : isHovered ? MAP_PALETTE.hover : MAP_PALETTE.outline;
           return (
             <lineLoop key={mesh.key} geometry={mesh.geometry}>
               <lineBasicMaterial color={color} linewidth={1} />
@@ -387,9 +404,15 @@ export default function Map3D({
           );
         })}
         {routeGeometry ? (
-          <line geometry={routeGeometry}>
-            <lineBasicMaterial color="#f97316" linewidth={2} />
-          </line>
+          <mesh geometry={routeGeometry} position={[0, 0, 0]}>
+            <meshStandardMaterial
+              color="#f97316"
+              emissive="#f97316"
+              emissiveIntensity={0.5}
+              metalness={0.2}
+              roughness={0.35}
+            />
+          </mesh>
         ) : null}
         {showLabels ? visibleLabels.map((label) => (
           <Html
@@ -404,7 +427,7 @@ export default function Map3D({
               style={{
                 padding: "2px 6px",
                 borderRadius: 6,
-                background: label.elevated ? "rgba(15, 23, 42, 0.8)" : "rgba(15, 23, 42, 0.65)",
+                background: label.elevated ? MAP_PALETTE.labelElevated : MAP_PALETTE.label,
                 color: "#ffffff",
                 fontSize: label.elevated ? 12 : 10,
                 fontWeight: label.elevated ? 700 : 600,
@@ -428,6 +451,11 @@ export default function Map3D({
         maxPolarAngle={Math.PI / 4}
         minDistance={Math.max(width, height) * 0.1}
         maxDistance={Math.max(width, height) * 3}
+        onStart={() => {
+          if (typeof onInteract === "function") {
+            onInteract();
+          }
+        }}
       />
     </Canvas>
   );

@@ -1,6 +1,5 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
@@ -32,6 +31,7 @@ const M = {
   bodyColor: "#96A7C9",
   inputColor: "#E4EDFF",
   primaryBtnBg: "#2A6DF0",
+  primaryBtnBorder: "#5F8EE5",
   primaryBtnText: "#F3F7FF",
   routeNodeBg: "#3D5683",
   routeFromColor: "#FFD7E0",
@@ -388,13 +388,14 @@ function MobileMapView({
           sx={{
             width: "100%",
             height: "40px",
-            background: isRouteDisabled ? "rgba(42, 109, 240, 0.4)" : M.primaryBtnBg,
-            border: "none",
+            background: isRouteDisabled ? "rgba(42, 109, 240, 0.5)" : M.primaryBtnBg,
+            border: `1px solid ${M.primaryBtnBorder}`,
             borderRadius: "12px",
             cursor: isRouteDisabled ? "not-allowed" : "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            opacity: isRouteDisabled ? 0.7 : 1,
           }}
         >
           <Typography
@@ -699,9 +700,30 @@ function MapPageView({
                     </MenuItem>
                   ))}
                 </TextField>
-                <Button variant="contained" onClick={handleBuildRoute} disabled={isRouteDisabled}>
+                <Box
+                  component="button"
+                  onClick={handleBuildRoute}
+                  disabled={isRouteDisabled}
+                  sx={{
+                    width: "100%",
+                    height: "40px",
+                    background: isRouteDisabled ? "rgba(42, 109, 240, 0.5)" : M.primaryBtnBg,
+                    border: "1px solid " + M.primaryBtnBorder,
+                    borderRadius: "12px",
+                    cursor: isRouteDisabled ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: "'Arial', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "14.4px",
+                    lineHeight: "17px",
+                    color: M.primaryBtnText,
+                    opacity: isRouteDisabled ? 0.7 : 1,
+                  }}
+                >
                   {isBuildingRoute ? "Строим маршрут..." : "Построить маршрут"}
-                </Button>
+                </Box>
                 {is3D ? (
                   <FormControlLabel
                     control={

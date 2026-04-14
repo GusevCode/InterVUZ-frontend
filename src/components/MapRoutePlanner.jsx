@@ -12,6 +12,7 @@ function buildGraph(graph) {
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const adjacency = new Map();
+  const edgeMap = new Map();
 
   nodes.forEach((node) => {
     adjacency.set(node.id, []);
@@ -28,24 +29,62 @@ function buildGraph(graph) {
     return Math.hypot(dx, dy);
   }
 
+  function getPointsLength(points) {
+    if (!Array.isArray(points) || points.length < 2) {
+      return null;
+    }
+    let length = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      const prev = points[index - 1];
+      const next = points[index];
+      const x1 = Number(prev?.x ?? prev?.[0]) || 0;
+      const y1 = Number(prev?.y ?? prev?.[1]) || 0;
+      const x2 = Number(next?.x ?? next?.[0]) || 0;
+      const y2 = Number(next?.y ?? next?.[1]) || 0;
+      length += Math.hypot(x2 - x1, y2 - y1);
+    }
+    return length;
+  }
+
+  function normalizePoints(points) {
+    if (!Array.isArray(points)) {
+      return [];
+    }
+    return points
+      .map((point) => {
+        const x = Number(point?.x ?? point?.[0]);
+        const y = Number(point?.y ?? point?.[1]);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          return null;
+        }
+        return { x, y };
+      })
+      .filter(Boolean);
+  }
+
   edges.forEach((edge) => {
     if (!edge?.from || !edge?.to) {
       return;
     }
-    const weight = Number(edge.weight) || getDistance(edge.from, edge.to) || 1;
+    const edgePoints = normalizePoints(edge.points);
+    const length = getPointsLength(edgePoints);
+    const weight = Number(edge.weight) || length || getDistance(edge.from, edge.to) || 1;
     if (!adjacency.has(edge.from)) {
       adjacency.set(edge.from, []);
     }
-    adjacency.get(edge.from).push({ to: edge.to, weight });
+    adjacency.get(edge.from).push({ to: edge.to, weight, points: edgePoints });
+    edgeMap.set(`${edge.from}__${edge.to}`, edgePoints);
     if (edge.bidirectional !== false) {
       if (!adjacency.has(edge.to)) {
         adjacency.set(edge.to, []);
       }
-      adjacency.get(edge.to).push({ to: edge.from, weight });
+      const reversed = [...edgePoints].reverse();
+      adjacency.get(edge.to).push({ to: edge.from, weight, points: reversed });
+      edgeMap.set(`${edge.to}__${edge.from}`, reversed);
     }
   });
 
-  return { nodes, nodeMap, adjacency };
+  return { nodes, nodeMap, adjacency, edgeMap };
 }
 
 function findShortestPath(graph, fromId, toId) {
@@ -159,10 +198,28 @@ export default function MapRoutePlanner({ graph, onRouteChange }) {
       return;
     }
 
-    const points = path
-      .map((nodeId) => graphData.nodeMap.get(nodeId))
-      .filter(Boolean)
-      .map((node) => ({ x: Number(node.x) || 0, y: Number(node.y) || 0 }));
+    const points = [];
+    for (let index = 0; index < path.length - 1; index += 1) {
+      const fromId = path[index];
+      const toId = path[index + 1];
+      const edgePoints = graphData.edgeMap.get(`${fromId}__${toId}`) ?? [];
+      const fallback = [
+        graphData.nodeMap.get(fromId),
+        graphData.nodeMap.get(toId),
+      ]
+        .filter(Boolean)
+        .map((node) => ({ x: Number(node.x) || 0, y: Number(node.y) || 0 }));
+      const segment = edgePoints.length > 0 ? edgePoints : fallback;
+      segment.forEach((point, pointIndex) => {
+        if (points.length > 0 && pointIndex === 0) {
+          const last = points[points.length - 1];
+          if (last.x === point.x && last.y === point.y) {
+            return;
+          }
+        }
+        points.push({ x: point.x, y: point.y });
+      });
+    }
 
     if (typeof onRouteChange === "function") {
       onRouteChange(points);

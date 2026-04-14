@@ -89,6 +89,145 @@ function extractChildText(nodes, tagName) {
   return value ? value : null;
 }
 
+function parseEdgeEndpoints(value) {
+  if (!value) {
+    return null;
+  }
+  const raw = String(value).trim();
+  if (!raw) {
+    return null;
+  }
+  const arrowMatch = raw.match(/([^-\s]+)\s*[-=]>\s*([^\s]+)/);
+  if (arrowMatch) {
+    return { from: arrowMatch[1], to: arrowMatch[2] };
+  }
+  const edgeMatch = raw.match(/^edge[_-]?(.+?)(?:__|_to_)(.+)$/i);
+  if (edgeMatch) {
+    return { from: edgeMatch[1], to: edgeMatch[2] };
+  }
+  return null;
+}
+
+function parsePathPoints(pathData) {
+  if (!pathData) {
+    return { points: [], hasUnsupported: false };
+  }
+  const tokens = String(pathData).match(/[a-zA-Z]|-?\d*\.?\d+(?:e[-+]?\d+)?/g);
+  if (!tokens) {
+    return { points: [], hasUnsupported: false };
+  }
+
+  let x = 0;
+  let y = 0;
+  let startX = 0;
+  let startY = 0;
+  let cmd = null;
+  const points = [];
+  let hasUnsupported = false;
+
+  function addPoint(nx, ny) {
+    x = nx;
+    y = ny;
+    points.push([x, y]);
+  }
+
+  let index = 0;
+  while (index < tokens.length) {
+    const token = tokens[index];
+    if (/^[a-zA-Z]$/.test(token)) {
+      cmd = token;
+      index += 1;
+      continue;
+    }
+
+    if (!cmd) {
+      index += 1;
+      continue;
+    }
+
+    const isRelative = cmd === cmd.toLowerCase();
+    const cmdUpper = cmd.toUpperCase();
+
+    if (cmdUpper === "M" || cmdUpper === "L") {
+      const xVal = Number(tokens[index]);
+      const yVal = Number(tokens[index + 1]);
+      if (!Number.isFinite(xVal) || !Number.isFinite(yVal)) {
+        break;
+      }
+      const nx = isRelative ? x + xVal : xVal;
+      const ny = isRelative ? y + yVal : yVal;
+      addPoint(nx, ny);
+      if (cmdUpper === "M") {
+        startX = nx;
+        startY = ny;
+        cmd = isRelative ? "l" : "L";
+      }
+      index += 2;
+      continue;
+    }
+
+    if (cmdUpper === "H") {
+      const xVal = Number(tokens[index]);
+      if (!Number.isFinite(xVal)) {
+        break;
+      }
+      const nx = isRelative ? x + xVal : xVal;
+      addPoint(nx, y);
+      index += 1;
+      continue;
+    }
+
+    if (cmdUpper === "V") {
+      const yVal = Number(tokens[index]);
+      if (!Number.isFinite(yVal)) {
+        break;
+      }
+      const ny = isRelative ? y + yVal : yVal;
+      addPoint(x, ny);
+      index += 1;
+      continue;
+    }
+
+    if (cmdUpper === "Z") {
+      addPoint(startX, startY);
+      index += 1;
+      continue;
+    }
+
+    hasUnsupported = true;
+    break;
+  }
+
+  return { points, hasUnsupported };
+}
+
+function densifyPoints(points, step) {
+  if (!points.length || !Number.isFinite(step) || step <= 0) {
+    return points;
+  }
+
+  const result = [points[0]];
+
+  for (let index = 1; index < points.length; index += 1) {
+    const [x1, y1] = points[index - 1];
+    const [x2, y2] = points[index];
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const distance = Math.hypot(dx, dy);
+    if (!Number.isFinite(distance) || distance === 0) {
+      continue;
+    }
+
+    const steps = Math.max(1, Math.ceil(distance / step));
+    for (let stepIndex = 1; stepIndex <= steps; stepIndex += 1) {
+      const t = stepIndex / steps;
+      result.push([x1 + dx * t, y1 + dy * t]);
+    }
+  }
+
+  return result;
+}
+
 function pointsToPath(points, closePath) {
   if (!points.length) {
     return null;
@@ -280,6 +419,9 @@ if (!inputPath) {
 const outputPath = getArgValue("--output")
   ?? inputPath.replace(/\.svg$/i, ".map.json")
   ?? "map.json";
+const graphOutputPath = getArgValue("--graph")
+  ?? inputPath.replace(/\.svg$/i, ".graph.json");
+const edgeStep = parseNumber(getArgValue("--edge-step")) ?? 24;
 
 const svgContent = fs.readFileSync(inputPath, "utf8");
 
@@ -332,6 +474,9 @@ const height = rootViewBox?.height ?? rootHeight ?? 1000;
 
 const elements = [];
 const warnings = [];
+const graphNodes = [];
+const graphEdges = [];
+let graphEnabled = false;
 
 function shouldSkip(style) {
   if (style.display === "none" || style.visibility === "hidden") {
@@ -361,7 +506,68 @@ function addElement({ id, d, style, title }) {
   });
 }
 
-function collect(nodes, inheritedStyle) {
+function getLayerKind(attrs, currentKind) {
+  const label = String(
+    attrs["inkscape:label"]
+    ?? attrs.label
+    ?? attrs.id
+    ?? "",
+  ).toLowerCase();
+
+  if (!label) {
+    return currentKind;
+  }
+
+  if (label.includes("graph") && label.includes("node")) {
+    return "nodes";
+  }
+  if (label.includes("graph") && (label.includes("edge") || label.includes("route") || label.includes("path"))) {
+    return "edges";
+  }
+  if (label === "nodes" || label.includes("nodes")) {
+    return "nodes";
+  }
+  if (label === "edges" || label.includes("edges") || label.includes("routes")) {
+    return "edges";
+  }
+
+  return currentKind;
+}
+
+function addGraphNode({ id, x, y, title }) {
+  if (!id) {
+    warnings.push("Graph node without id was ignored.");
+    return;
+  }
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    warnings.push(`Graph node ${id} has invalid координаты.`);
+    return;
+  }
+
+  graphNodes.push({
+    id,
+    x,
+    y,
+    label: title || undefined,
+  });
+}
+
+function addGraphEdge({ id, from, to, points }) {
+  if (!from || !to) {
+    warnings.push(`Graph edge ${id || "unknown"} missing endpoints.`);
+    return;
+  }
+
+  graphEdges.push({
+    id: id || undefined,
+    from,
+    to,
+    points: points?.length ? points : undefined,
+  });
+}
+
+function collect(nodes, inheritedStyle, layerKind) {
   if (!Array.isArray(nodes)) {
     return;
   }
@@ -378,22 +584,55 @@ function collect(nodes, inheritedStyle) {
     const childNodes = node[tag] ?? [];
     const attrs = readAttributes(childNodes, node[":@"] ?? {});
     const style = mergeStyle(inheritedStyle, parseStyle(attrs));
+    const nextLayerKind = tag === "g" ? getLayerKind(attrs, layerKind) : layerKind;
+    const title = extractChildText(childNodes, "title");
 
     if (attrs.transform) {
       warnings.push(`Transform ignored on <${tag}>${attrs.id ? `#${attrs.id}` : ""}: ${attrs.transform}`);
     }
 
     if (tag === "path") {
+      if (nextLayerKind === "edges") {
+        const { points, hasUnsupported } = parsePathPoints(attrs.d);
+        const endpoints = parseEdgeEndpoints(attrs["inkscape:label"] ?? attrs.label ?? attrs.id ?? title);
+        if (hasUnsupported) {
+          warnings.push(`Graph edge ${attrs.id || "path"} содержит кривые. Используйте прямые сегменты.`);
+        }
+        graphEnabled = true;
+        addGraphEdge({
+          id: attrs.id,
+          from: endpoints?.from ?? null,
+          to: endpoints?.to ?? null,
+          points: densifyPoints(points, edgeStep),
+        });
+        return;
+      }
+
       addElement({
         id: attrs.id,
         d: attrs.d ?? null,
         style,
-        title: extractChildText(childNodes, "title"),
+        title,
       });
       return;
     }
 
     if (tag === "rect") {
+      if (nextLayerKind === "nodes") {
+        const x = parseNumber(attrs.x) ?? 0;
+        const y = parseNumber(attrs.y) ?? 0;
+        const width = parseNumber(attrs.width) ?? 0;
+        const height = parseNumber(attrs.height) ?? 0;
+        graphEnabled = true;
+        addGraphNode({
+          id: attrs.id,
+          x: x + width / 2,
+          y: y + height / 2,
+          title,
+        });
+        return;
+      }
+
       addElement({
         id: attrs.id,
         d: rectToPath({
@@ -405,32 +644,70 @@ function collect(nodes, inheritedStyle) {
           ry: parseNumber(attrs.ry),
         }),
         style,
-        title: extractChildText(childNodes, "title"),
+        title,
       });
       return;
     }
 
     if (tag === "circle") {
+      if (nextLayerKind === "nodes") {
+        graphEnabled = true;
+        addGraphNode({
+          id: attrs.id,
+          x: parseNumber(attrs.cx),
+          y: parseNumber(attrs.cy),
+          title,
+        });
+        return;
+      }
+
       addElement({
         id: attrs.id,
         d: circleToPath(parseNumber(attrs.cx), parseNumber(attrs.cy), parseNumber(attrs.r)),
         style,
-        title: extractChildText(childNodes, "title"),
+        title,
       });
       return;
     }
 
     if (tag === "ellipse") {
+      if (nextLayerKind === "nodes") {
+        graphEnabled = true;
+        addGraphNode({
+          id: attrs.id,
+          x: parseNumber(attrs.cx),
+          y: parseNumber(attrs.cy),
+          title,
+        });
+        return;
+      }
+
       addElement({
         id: attrs.id,
         d: ellipseToPath(parseNumber(attrs.cx), parseNumber(attrs.cy), parseNumber(attrs.rx), parseNumber(attrs.ry)),
         style,
-        title: extractChildText(childNodes, "title"),
+        title,
       });
       return;
     }
 
     if (tag === "line") {
+      if (nextLayerKind === "edges") {
+        const points = [
+          [parseNumber(attrs.x1), parseNumber(attrs.y1)],
+          [parseNumber(attrs.x2), parseNumber(attrs.y2)],
+        ].filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+        const endpoints = parseEdgeEndpoints(attrs["inkscape:label"] ?? attrs.label ?? attrs.id ?? title);
+        graphEnabled = true;
+        addGraphEdge({
+          id: attrs.id,
+          from: endpoints?.from ?? null,
+          to: endpoints?.to ?? null,
+          points: densifyPoints(points, edgeStep),
+        });
+        return;
+      }
+
       addElement({
         id: attrs.id,
         d: lineToPath(
@@ -440,38 +717,62 @@ function collect(nodes, inheritedStyle) {
           parseNumber(attrs.y2),
         ),
         style,
-        title: extractChildText(childNodes, "title"),
+        title,
       });
       return;
     }
 
     if (tag === "polyline") {
+      if (nextLayerKind === "edges") {
+        const endpoints = parseEdgeEndpoints(attrs["inkscape:label"] ?? attrs.label ?? attrs.id ?? title);
+        graphEnabled = true;
+        addGraphEdge({
+          id: attrs.id,
+          from: endpoints?.from ?? null,
+          to: endpoints?.to ?? null,
+          points: densifyPoints(parsePoints(attrs.points), edgeStep),
+        });
+        return;
+      }
+
       addElement({
         id: attrs.id,
         d: pointsToPath(parsePoints(attrs.points), false),
         style,
-        title: extractChildText(childNodes, "title"),
+        title,
       });
       return;
     }
 
     if (tag === "polygon") {
+      if (nextLayerKind === "edges") {
+        const endpoints = parseEdgeEndpoints(attrs["inkscape:label"] ?? attrs.label ?? attrs.id ?? title);
+        graphEnabled = true;
+        addGraphEdge({
+          id: attrs.id,
+          from: endpoints?.from ?? null,
+          to: endpoints?.to ?? null,
+          points: densifyPoints(parsePoints(attrs.points), edgeStep),
+        });
+        return;
+      }
+
       addElement({
         id: attrs.id,
         d: pointsToPath(parsePoints(attrs.points), true),
         style,
-        title: extractChildText(childNodes, "title"),
+        title,
       });
       return;
     }
 
     if (tag === "g" || tag === "svg") {
-      collect(childNodes, style);
+      collect(childNodes, style, nextLayerKind);
     }
   });
 }
 
-collect(svgChildren, {});
+collect(svgChildren, {}, null);
 
 const output = {
   version: 1,
@@ -489,6 +790,19 @@ fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
 
 console.log(`Saved ${elements.length} elements to ${outputPath}`);
+if (graphEnabled) {
+  const graphOutput = {
+    version: 1,
+    nodes: graphNodes,
+    edges: graphEdges,
+    meta: {
+      source: path.basename(inputPath),
+      generatedAt: new Date().toISOString(),
+    },
+  };
+  fs.writeFileSync(graphOutputPath, `${JSON.stringify(graphOutput, null, 2)}\n`, "utf8");
+  console.log(`Saved ${graphNodes.length} nodes and ${graphEdges.length} edges to ${graphOutputPath}`);
+}
 if (warnings.length > 0) {
   console.warn("Warnings:");
   warnings.forEach((warning) => console.warn(`- ${warning}`));

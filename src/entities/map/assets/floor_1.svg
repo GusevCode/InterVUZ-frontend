@@ -23,19 +23,20 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="1.3875"
-     inkscape:cx="342.34234"
-     inkscape:cy="254.77477"
+     inkscape:zoom="0.98111066"
+     inkscape:cx="691.05355"
+     inkscape:cy="235.95707"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
-     inkscape:current-layer="g1" />
+     inkscape:current-layer="layer1" />
   <defs
      id="defs1" />
   <g
-     id="g1">
+     id="g1"
+     transform="translate(-1.981982,2.5225225)">
     <image
        width="1280"
        height="570"
@@ -387,6 +388,214 @@
        inkscape:label="stairs">
       <title
          id="title43">stairs</title>
+    </path>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer1"
+     inkscape:label="graph:nodes">
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_006"
+       cx="1063"
+       cy="126.55856"
+       r="4"
+       inkscape:label="n_f1_006">
+      <title
+         id="title44-2-1-1-1-1">Вход в аудиторию 114</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_011"
+       cx="1062.197"
+       cy="165.91394"
+       r="4"
+       inkscape:label="n_f1_011">
+      <title
+         id="title44-2-1-1-1-1-0">Проход к аудиториям КК</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_007"
+       cx="950.66669"
+       cy="168.42342"
+       r="4"
+       inkscape:label="n_f1_007">
+      <title
+         id="title44-2-1-1-1-1-5">Вход в крыло с КК</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_002"
+       cx="336.23425"
+       cy="151.05405"
+       r="4"
+       inkscape:label="n_f1_002">
+      <title
+         id="title44-2">Мужской туалет</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_010"
+       cx="236"
+       cy="175.8018"
+       r="4"
+       inkscape:label="n_f1_010">
+      <title
+         id="title44-2-3">Турникеты </title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_003"
+       cx="459.15317"
+       cy="156.27928"
+       r="4"
+       inkscape:label="n_f1_003">
+      <title
+         id="title44-2-1">Женский туалет</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_004"
+       cx="482.2973"
+       cy="300.97296"
+       r="4"
+       inkscape:label="n_f1_004">
+      <title
+         id="title44-2-1-1">Вход в аудиторию 129</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_005"
+       cx="501.79279"
+       cy="301.36035"
+       r="4"
+       inkscape:label="n_f1_005">
+      <title
+         id="title44-2-1-1-1">Вход в аудиторию 127</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_009"
+       cx="578.52551"
+       cy="300.76443"
+       r="4"
+       inkscape:label="n_f1_009">
+      <title
+         id="title44-2-1-1-1-3">Проход к аудиториям 127-129 | 2</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_008"
+       cx="580.99664"
+       cy="205.68057"
+       r="4"
+       inkscape:label="n_f1_008">
+      <title
+         id="title44-2-1-1-1-3-7">Проход к аудиториям 127-129</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_001"
+       cx="395.31531"
+       cy="207.20721"
+       r="4"
+       inkscape:label="n_f1_001">
+      <title
+         id="title44">Вход БЗДК</title>
+    </circle>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="graph:edges">
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 950.70825,168.17675 111.35335,-2.03851 z"
+       id="n_f1_007-_n_f1_011"
+       inkscape:label="n_f1_007-&gt;n_f1_011">
+      <title
+         id="title54">n_f1_007-&gt;n_f1_011</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 577.91646,300.67964 -75.67954,0.25481 z"
+       id="n_f1_005-_n_f1_009"
+       inkscape:label="n_f1_005-&gt;n_f1_009">
+      <title
+         id="title52">n_f1_005-&gt;n_f1_009</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 236.4667,176.33077 159.5131,30.83241 z"
+       id="n_f1_010-_n_f1_001"
+       inkscape:label="n_f1_010-&gt;n_f1_001">
+      <title
+         id="title47">n_f1_010-&gt;n_f1_001</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 580.71941,205.12467 -1.7837,96.0646 z"
+       id="n_f1_008-_n_f1_009"
+       inkscape:label="n_f1_008-&gt;n_f1_009">
+      <title
+         id="title49">n_f1_008-&gt;n_f1_009</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="M 502.23692,300.93445 H 481.59705 Z"
+       id="n_f1_005-_n_f1_004"
+       inkscape:label="n_f1_005-&gt;n_f1_004">
+      <title
+         id="title50">n_f1_005-&gt;n_f1_004</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 335.4955,150.99099 60,56.93694 z"
+       id="n_f1_001-_n_f1_002"
+       inkscape:label="n_f1_001-&gt;n_f1_002">
+      <title
+         id="title46">n_f1_001-&gt;n_f1_002</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="M 235.4955,176.21622 336.75676,150.99099 Z"
+       id="n_f1_010-_n_f1_002"
+       inkscape:label="n_f1_010-&gt;n_f1_002">
+      <title
+         id="title45">n_f1_010-&gt;n_f1_002</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 395.21536,207.6728 64.97738,-51.72709 z"
+       id="n_f1_001-_n_f1_008"
+       inkscape:label="n_f1_001-&gt;n_f1_008">
+      <title
+         id="title48">n_f1_001-&gt;n_f1_008</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 395.9798,207.41799 185.50405,-1.52888 z"
+       id="path48"
+       inkscape:label="n_f1_001-&gt;n_f1_008">
+      <title
+         id="title51">n_f1_001-&gt;n_f1_008</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="M 581.48385,205.37948 951.47269,168.17675 Z"
+       id="n_f1_008-_n_f1_007"
+       inkscape:label="n_f1_008-&gt;n_f1_007">
+      <title
+         id="title53">n_f1_008-&gt;n_f1_007</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="M 1063.0809,166.64787 V 125.62293 Z"
+       id="n_f1_011-_n_f1_006"
+       inkscape:label="n_f1_011-&gt;n_f1_006">
+      <title
+         id="title55">n_f1_011-&gt;n_f1_006</title>
     </path>
   </g>
 </svg>
