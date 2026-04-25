@@ -10,6 +10,7 @@ import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Map3D from "../../components/Map3D";
@@ -47,6 +48,12 @@ function MobileMapView({
   setLocalRoutePoints,
   routeFromPlaceId,
   routeToPlaceId,
+  selectedPlace,
+  scheduleDate,
+  setScheduleDate,
+  roomSchedule,
+  isLoadingRoomSchedule,
+  roomScheduleError,
 }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -258,6 +265,18 @@ function MobileMapView({
           {mapWarning}
         </Typography>
       ) : null}
+
+      {selectedPlace?.type === "classroom" ? (
+        <RoomSchedulePanel
+          selectedPlace={selectedPlace}
+          scheduleDate={scheduleDate}
+          setScheduleDate={setScheduleDate}
+          roomSchedule={roomSchedule}
+          isLoadingRoomSchedule={isLoadingRoomSchedule}
+          roomScheduleError={roomScheduleError}
+          dark
+        />
+      ) : null}
     </Box>
   );
 }
@@ -285,6 +304,11 @@ function MapPageView({
   selectedPlaceId,
   setSelectedPlaceId,
   selectedPlace,
+  scheduleDate,
+  setScheduleDate,
+  roomSchedule,
+  isLoadingRoomSchedule,
+  roomScheduleError,
   formatPlaceType,
   mapImage,
   mapVector,
@@ -339,6 +363,12 @@ function MapPageView({
         setSelectedPlaceId={setSelectedPlaceId}
         mapGraph={mapGraph}
         setLocalRoutePoints={setLocalRoutePoints}
+        selectedPlace={selectedPlace}
+        scheduleDate={scheduleDate}
+        setScheduleDate={setScheduleDate}
+        roomSchedule={roomSchedule}
+        isLoadingRoomSchedule={isLoadingRoomSchedule}
+        roomScheduleError={roomScheduleError}
       />
     );
   }
@@ -475,6 +505,16 @@ function MapPageView({
                         variant="outlined"
                       />
                     </Stack>
+                    {selectedPlace.type === "classroom" ? (
+                      <RoomSchedulePanel
+                        selectedPlace={selectedPlace}
+                        scheduleDate={scheduleDate}
+                        setScheduleDate={setScheduleDate}
+                        roomSchedule={roomSchedule}
+                        isLoadingRoomSchedule={isLoadingRoomSchedule}
+                        roomScheduleError={roomScheduleError}
+                      />
+                    ) : null}
                   </CardContent>
                 </Card>
               ) : null}
@@ -668,6 +708,111 @@ function MapPageView({
       </Grid>
     </Grid>
   );
+}
+
+function RoomSchedulePanel({
+  selectedPlace,
+  scheduleDate,
+  setScheduleDate,
+  roomSchedule,
+  isLoadingRoomSchedule,
+  roomScheduleError,
+  dark = false,
+}) {
+  const textColor = dark ? "#ECF2FF" : "text.primary";
+  const mutedColor = dark ? "#AFBFDE" : "text.secondary";
+
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Stack spacing={1.25}>
+        <TextField
+          label="Дата расписания"
+          type="date"
+          size="small"
+          value={scheduleDate}
+          onChange={(event) => setScheduleDate(event.target.value)}
+          slotProps={{ inputLabel: { shrink: true } }}
+          sx={dark ? {
+            input: { color: "#E4EDFF", colorScheme: "dark" },
+            label: { color: mutedColor },
+            fieldset: { borderColor: "#355180" },
+          } : undefined}
+        />
+
+        {isLoadingRoomSchedule ? (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <CircularProgress size={18} />
+            <Typography variant="body2" sx={{ color: mutedColor }}>
+              Загрузка расписания…
+            </Typography>
+          </Stack>
+        ) : null}
+
+        {roomScheduleError ? (
+          <Alert severity="error">{roomScheduleError}</Alert>
+        ) : null}
+
+        {!isLoadingRoomSchedule && !roomScheduleError && (roomSchedule?.items?.length ?? 0) === 0 ? (
+          <Typography variant="body2" sx={{ color: mutedColor }}>
+            Для {selectedPlace.name} на выбранную дату событий нет.
+          </Typography>
+        ) : null}
+
+        {!isLoadingRoomSchedule && !roomScheduleError ? (
+          <Stack spacing={1}>
+            {(roomSchedule?.items ?? []).map((item) => (
+              <Box
+                key={`${item.kind}-${item.id}`}
+                sx={{
+                  border: "1px solid",
+                  borderColor: dark ? "#355180" : "divider",
+                  borderRadius: 1,
+                  p: 1,
+                  bgcolor: dark ? "#172842" : "background.paper",
+                }}
+              >
+                <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
+                  <Typography variant="subtitle2" sx={{ color: textColor }}>
+                    {item.title}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={item.kind === "booking" ? "Бронь" : weekLabel(item.week)}
+                    color={item.kind === "booking" ? "secondary" : "primary"}
+                    variant={dark ? "filled" : "outlined"}
+                  />
+                </Stack>
+                <Typography variant="body2" sx={{ color: mutedColor }}>
+                  {item.startTime}–{item.endTime}
+                </Typography>
+                {item.groups?.length > 0 ? (
+                  <Typography variant="caption" sx={{ color: mutedColor }} display="block">
+                    {item.groups.join(", ")}
+                  </Typography>
+                ) : null}
+                {item.teachers?.length > 0 ? (
+                  <Typography variant="caption" sx={{ color: mutedColor }} display="block">
+                    {item.teachers.join(", ")}
+                  </Typography>
+                ) : null}
+                {item.bookerName ? (
+                  <Typography variant="caption" sx={{ color: mutedColor }} display="block">
+                    {item.bookerName}
+                  </Typography>
+                ) : null}
+              </Box>
+            ))}
+          </Stack>
+        ) : null}
+      </Stack>
+    </Box>
+  );
+}
+
+function weekLabel(week) {
+  if (week === "ch") return "Числ.";
+  if (week === "zn") return "Знам.";
+  return "Каждую";
 }
 
 export default MapPageView;

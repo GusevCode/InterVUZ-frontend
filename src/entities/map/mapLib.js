@@ -314,3 +314,6 @@ export async function buildRoute({ fromPlaceId, toPlaceId, accessibleOnly = fals
   };
 }
 
+export async function getRoomSchedule(roomId, date) {
+  return fetchJson(`/rooms/${encodeURIComponent(roomId)}/schedule`, { date });
+}

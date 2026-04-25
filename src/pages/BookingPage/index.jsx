@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  addBookingDuration,
   cancelBooking,
   createBooking,
   fetchBookings,
@@ -68,6 +69,10 @@ function BookingPage() {
     void loadBookings();
   }, [loadBookings]);
 
+  useEffect(() => {
+    setTimeEnd(addBookingDuration(timeStart));
+  }, [timeStart]);
+
   const sortedBookings = useMemo(
     () =>
       [...bookings].sort((a, b) => {
@@ -90,26 +95,22 @@ function BookingPage() {
 
     if (!selectedRoomId) { setError("Выберите аудиторию."); return; }
     if (!selectedDate)   { setError("Укажите дату."); return; }
-    if (!timeStart || !timeEnd) { setError("Укажите время начала и окончания."); return; }
-
-    const [sh, sm] = timeStart.split(":").map(Number);
-    const [eh, em] = timeEnd.split(":").map(Number);
-    if (sh * 60 + sm >= eh * 60 + em) {
-      setError("Время окончания должно быть позже времени начала.");
-      return;
-    }
+    if (!timeStart) { setError("Укажите время начала."); return; }
+    if (!bookedBy.trim()) { setError("Укажите имя."); return; }
+    if (!purpose.trim()) { setError("Укажите контакт."); return; }
 
     setSubmitting(true);
     try {
+      const fixedTimeEnd = addBookingDuration(timeStart);
       await createBooking({
         room_id: selectedRoomId,
         date: selectedDate,
         time_start: timeStart,
-        time_end: timeEnd,
-        booked_by: bookedBy.trim() || "Аноним",
-        purpose: purpose.trim() || "Без указания цели",
+        time_end: fixedTimeEnd,
+        booked_by: bookedBy.trim(),
+        booker_contact: purpose.trim(),
       });
-      setSuccess(`Аудитория успешно забронирована на ${timeStart}–${timeEnd}!`);
+      setSuccess(`Аудитория успешно забронирована на ${timeStart}–${fixedTimeEnd}!`);
       setBookedBy("");
       setPurpose("");
       await loadBookings();
@@ -140,7 +141,7 @@ function BookingPage() {
       timeStart={timeStart}
       setTimeStart={setTimeStart}
       timeEnd={timeEnd}
-      setTimeEnd={setTimeEnd}
+      setTimeEnd={() => {}}
       bookedBy={bookedBy}
       setBookedBy={setBookedBy}
       purpose={purpose}

@@ -105,6 +105,10 @@ function MobileBookingView({
   setTimeStart,
   timeEnd,
   setTimeEnd,
+  bookedBy,
+  setBookedBy,
+  purpose,
+  setPurpose,
   error,
   success,
   handleBook,
@@ -238,6 +242,7 @@ function MobileBookingView({
                 size="small"
                 value={timeEnd}
                 onChange={(e) => setTimeEnd(e.target.value)}
+                disabled
                 variant="standard"
                 disableUnderline
                 fullWidth
@@ -275,6 +280,96 @@ function MobileBookingView({
           ))}
         </MobileSelectInput>
 
+        <Box sx={{ mt: "17px" }}>
+          <Typography
+            sx={{
+              fontFamily: "'Manrope', sans-serif",
+              fontWeight: 700,
+              fontSize: "13.3px",
+              lineHeight: "18px",
+              letterSpacing: "0.531px",
+              textTransform: "uppercase",
+              color: M.labelColor,
+              mb: "8px",
+            }}
+          >
+            Имя
+          </Typography>
+          <Box
+            sx={{
+              background: M.inputBg,
+              border: `1px solid ${M.inputBorder}`,
+              borderRadius: "12px",
+              height: "46px",
+              display: "flex",
+              alignItems: "center",
+              px: "13px",
+            }}
+          >
+            <Box
+              component="input"
+              value={bookedBy}
+              onChange={(e) => setBookedBy(e.target.value)}
+              placeholder="Фамилия И.О."
+              sx={{
+                width: "100%",
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 400,
+                fontSize: "14.7px",
+                color: M.inputColor,
+              }}
+            />
+          </Box>
+        </Box>
+
+        <Box sx={{ mt: "17px" }}>
+          <Typography
+            sx={{
+              fontFamily: "'Manrope', sans-serif",
+              fontWeight: 700,
+              fontSize: "13.3px",
+              lineHeight: "18px",
+              letterSpacing: "0.531px",
+              textTransform: "uppercase",
+              color: M.labelColor,
+              mb: "8px",
+            }}
+          >
+            Контакт
+          </Typography>
+          <Box
+            sx={{
+              background: M.inputBg,
+              border: `1px solid ${M.inputBorder}`,
+              borderRadius: "12px",
+              height: "46px",
+              display: "flex",
+              alignItems: "center",
+              px: "13px",
+            }}
+          >
+            <Box
+              component="input"
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              placeholder="Телефон, Telegram или email"
+              sx={{
+                width: "100%",
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 400,
+                fontSize: "14.7px",
+                color: M.inputColor,
+              }}
+            />
+          </Box>
+        </Box>
+
         {error ? (
           <Typography
             sx={{
@@ -300,7 +395,7 @@ function MobileBookingView({
           </Typography>
         ) : null}
 
-        {/* Find button */}
+        {/* Booking button */}
         <Box
           component="button"
           onClick={handleBook}
@@ -515,6 +610,10 @@ function BookingPageView({
         setTimeStart={setTimeStart}
         timeEnd={timeEnd}
         setTimeEnd={setTimeEnd}
+        bookedBy={bookedBy}
+        setBookedBy={setBookedBy}
+        purpose={purpose}
+        setPurpose={setPurpose}
         error={error}
         success={success}
         handleBook={handleBook}
@@ -541,6 +640,10 @@ function BookingPageView({
               description="Выберите аудиторию, дату и временной диапазон."
             >
               <Stack spacing={1.5}>
+                <Alert severity="info" sx={{ py: 0.5 }}>
+                  Бронь создаётся на фиксированные 1,5 часа.
+                </Alert>
+
                 <LabeledSelect
                   label="Аудитория"
                   value={selectedRoomId}
@@ -591,6 +694,7 @@ function BookingPageView({
                     label="Конец"
                     value={timeEnd}
                     onChange={(e) => setTimeEnd(e.target.value)}
+                    disabled
                   >
                     {timeSlots.slice(1).map((t) => (
                       <MenuItem key={t} value={t}>
@@ -603,7 +707,7 @@ function BookingPageView({
                 <TextField
                   size="small"
                   fullWidth
-                  label="Ваше имя (необязательно)"
+                  label="Ваше имя"
                   value={bookedBy}
                   onChange={(e) => setBookedBy(e.target.value)}
                   placeholder="Фамилия И.О."
@@ -612,10 +716,10 @@ function BookingPageView({
                 <TextField
                   size="small"
                   fullWidth
-                  label="Цель бронирования (необязательно)"
+                  label="Контакт"
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value)}
-                  placeholder="Лекция, семинар, собрание…"
+                  placeholder="Телефон, Telegram или email"
                 />
 
                 {error ? (

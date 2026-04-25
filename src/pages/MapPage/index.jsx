@@ -6,6 +6,7 @@ import {
   getMapVectors,
   getMapGraphs,
   getPlaces,
+  getRoomSchedule,
 } from "../../entities/map/mapLib";
 import MapPageView from "./MapPageView";
 
@@ -51,6 +52,10 @@ function getMapBaseName(fileName = "") {
     .replace(/\.graph\.json$/i, "");
 }
 
+function getTodayDate() {
+  return new Date().toISOString().split("T")[0];
+}
+
 function MapPage() {
   const [floors, setFloors] = useState([]);
   const [selectedFloorId, setSelectedFloorId] = useState("");
@@ -70,6 +75,10 @@ function MapPage() {
   const [showLabels, setShowLabels] = useState(true);
   const [localRoutePoints, setLocalRoutePoints] = useState([]);
   const [routeError, setRouteError] = useState("");
+  const [scheduleDate, setScheduleDate] = useState(getTodayDate());
+  const [roomSchedule, setRoomSchedule] = useState(null);
+  const [isLoadingRoomSchedule, setIsLoadingRoomSchedule] = useState(false);
+  const [roomScheduleError, setRoomScheduleError] = useState("");
   const [isLoadingFloors, setIsLoadingFloors] = useState(true);
   const [isLoadingMap, setIsLoadingMap] = useState(false);
   const [isBuildingRoute, setIsBuildingRoute] = useState(false);
@@ -268,6 +277,43 @@ function MapPage() {
     };
   }, [floors, selectedFloorId]);
 
+  useEffect(() => {
+    const place = places.find((p) => p.id === selectedPlaceId);
+    if (!place || place.type !== "classroom" || !scheduleDate) {
+      setRoomSchedule(null);
+      setRoomScheduleError("");
+      return undefined;
+    }
+
+    let isMounted = true;
+    setIsLoadingRoomSchedule(true);
+    setRoomScheduleError("");
+
+    getRoomSchedule(place.id, scheduleDate)
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+        setRoomSchedule(response);
+      })
+      .catch((scheduleError) => {
+        if (!isMounted) {
+          return;
+        }
+        setRoomSchedule(null);
+        setRoomScheduleError(scheduleError.message || "Не удалось загрузить расписание аудитории.");
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingRoomSchedule(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [places, selectedPlaceId, scheduleDate]);
+
   const selectedFloor = floors.find((floor) => floor.id === selectedFloorId) || null;
   const selectedPlace = places.find((place) => place.id === selectedPlaceId) || null;
   const routeFromPlace = places.find((place) => place.id === routeFromPlaceId) || null;
@@ -343,6 +389,11 @@ function MapPage() {
       selectedPlaceId={selectedPlaceId}
       setSelectedPlaceId={setSelectedPlaceId}
       selectedPlace={selectedPlace}
+      scheduleDate={scheduleDate}
+      setScheduleDate={setScheduleDate}
+      roomSchedule={roomSchedule}
+      isLoadingRoomSchedule={isLoadingRoomSchedule}
+      roomScheduleError={roomScheduleError}
       formatPlaceType={formatPlaceType}
       mapImage={mapImage}
       mapVector={mapVector}
