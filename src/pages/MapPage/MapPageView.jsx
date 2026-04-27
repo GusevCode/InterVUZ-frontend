@@ -30,9 +30,12 @@ function MobileMapView({
   mapWarning,
   mapImage,
   mapVector,
+  mapPois,
   is3D,
   hasMapAsset,
   selectedVectorId,
+  targetVectorId,
+  targetPlaceId,
   setSelectedVectorId,
   showLabels,
   localRoutePoints,
@@ -91,6 +94,7 @@ function MobileMapView({
             <Map3D
               mapVector={mapVector}
               selectedId={selectedVectorId}
+              targetId={targetVectorId}
               onSelect={setSelectedVectorId}
               showLabels={showLabels}
               routePoints={localRoutePoints}
@@ -167,6 +171,32 @@ function MobileMapView({
                 })}
               </Box>
             ) : null}
+            {mapPois.map((poi) => {
+              const isSelectedPoi = selectedVectorId === poi.id;
+              const isTargetPoi = targetVectorId === poi.id;
+              return (
+                <Box
+                  key={poi.id}
+                  onClick={() => setSelectedVectorId(poi.id)}
+                  title={poi.title || poi.id}
+                  sx={{
+                    position: "absolute",
+                    left: `${getCoordinatePercent(poi.x, mapWidth)}%`,
+                    top: `${getCoordinatePercent(poi.y, mapHeight)}%`,
+                    transform: "translate(-50%, -50%)",
+                    width: isSelectedPoi || isTargetPoi ? 16 : 12,
+                    height: isSelectedPoi || isTargetPoi ? 16 : 12,
+                    borderRadius: "50%",
+                    border: "2px solid #ffffff",
+                    bgcolor: "#f59e0b",
+                    boxShadow: "0 3px 10px rgba(0,0,0,0.45)",
+                    cursor: "pointer",
+                    transition: "all 160ms ease",
+                    zIndex: 3,
+                  }}
+                />
+              );
+            })}
             {places.map((place) => {
               const isSelected = place.id === selectedPlaceId;
               const isFrom = place.id === routeFromPlaceId;
@@ -193,6 +223,41 @@ function MobileMapView({
                 />
               );
             })}
+            {targetPlaceId ? places.filter((place) => place.id === targetPlaceId).map((place) => (
+              <Box
+                key={`target-${place.id}`}
+                sx={{
+                  position: "absolute",
+                  left: `${getCoordinatePercent(place.coordinates.x, mapWidth)}%`,
+                  top: `${getCoordinatePercent(place.coordinates.y, mapHeight)}%`,
+                  transform: "translate(-50%, -50%)",
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  border: "2px solid rgba(248, 113, 113, 0.95)",
+                  boxShadow: "0 0 0 4px rgba(248, 113, 113, 0.22)",
+                  pointerEvents: "none",
+                }}
+              />
+            )) : null}
+            {targetVectorId ? mapPois.filter((poi) => poi.id === targetVectorId).map((poi) => (
+              <Box
+                key={`target-poi-${poi.id}`}
+                sx={{
+                  position: "absolute",
+                  left: `${getCoordinatePercent(poi.x, mapWidth)}%`,
+                  top: `${getCoordinatePercent(poi.y, mapHeight)}%`,
+                  transform: "translate(-50%, -50%)",
+                  width: 26,
+                  height: 26,
+                  borderRadius: "50%",
+                  border: "2px solid rgba(245, 158, 11, 0.95)",
+                  boxShadow: "0 0 0 4px rgba(245, 158, 11, 0.22)",
+                  pointerEvents: "none",
+                  zIndex: 2,
+                }}
+              />
+            )) : null}
           </>
         ) : (
           <Typography
@@ -312,11 +377,14 @@ function MapPageView({
   formatPlaceType,
   mapImage,
   mapVector,
+  mapPois,
   mapVectors,
   selectedMapId,
   setSelectedMapId,
   mapGraph,
   selectedVectorId,
+  targetVectorId,
+  targetPlaceId,
   setSelectedVectorId,
   showLabels,
   setShowLabels,
@@ -347,9 +415,12 @@ function MapPageView({
         mapWarning={mapWarning}
         mapImage={mapImage}
         mapVector={mapVector}
+        mapPois={mapPois}
         is3D={is3D}
         hasMapAsset={hasMapAsset}
         selectedVectorId={selectedVectorId}
+        targetVectorId={targetVectorId}
+        targetPlaceId={targetPlaceId}
         setSelectedVectorId={setSelectedVectorId}
         showLabels={showLabels}
         localRoutePoints={localRoutePoints}
@@ -550,6 +621,7 @@ function MapPageView({
                   <Map3D
                     mapVector={mapVector}
                     selectedId={selectedVectorId}
+                    targetId={targetVectorId}
                     onSelect={setSelectedVectorId}
                     showLabels={showLabels}
                     routePoints={localRoutePoints}
@@ -645,6 +717,33 @@ function MapPageView({
                 </Box>
               ) : null}
 
+              {!is3D && mapPois.map((poi) => {
+                const isSelectedPoi = selectedVectorId === poi.id;
+                const isTargetPoi = targetVectorId === poi.id;
+                return (
+                  <Box
+                    key={poi.id}
+                    onClick={() => setSelectedVectorId(poi.id)}
+                    title={poi.title || poi.id}
+                    sx={{
+                      position: "absolute",
+                      left: `${getCoordinatePercent(poi.x, mapWidth)}%`,
+                      top: `${getCoordinatePercent(poi.y, mapHeight)}%`,
+                      transform: "translate(-50%, -50%)",
+                      width: isSelectedPoi || isTargetPoi ? 18 : 14,
+                      height: isSelectedPoi || isTargetPoi ? 18 : 14,
+                      borderRadius: "50%",
+                      border: "2px solid #ffffff",
+                      bgcolor: "#f59e0b",
+                      boxShadow: "0 4px 14px rgba(22, 33, 48, 0.34)",
+                      cursor: "pointer",
+                      transition: "all 160ms ease",
+                      zIndex: 3,
+                    }}
+                  />
+                );
+              })}
+
               {!is3D && places.map((place) => {
                 const isSelected = place.id === selectedPlaceId;
                 const isRouteFrom = place.id === routeFromPlaceId;
@@ -681,6 +780,41 @@ function MapPageView({
                   />
                 );
               })}
+              {!is3D && targetPlaceId ? places.filter((place) => place.id === targetPlaceId).map((place) => (
+                <Box
+                  key={`target-${place.id}`}
+                  sx={{
+                    position: "absolute",
+                    left: `${getCoordinatePercent(place.coordinates.x, mapWidth)}%`,
+                    top: `${getCoordinatePercent(place.coordinates.y, mapHeight)}%`,
+                    transform: "translate(-50%, -50%)",
+                    width: 34,
+                    height: 34,
+                    borderRadius: "50%",
+                    border: "2px solid rgba(248, 113, 113, 0.95)",
+                    boxShadow: "0 0 0 6px rgba(248, 113, 113, 0.20)",
+                    pointerEvents: "none",
+                  }}
+                />
+              )) : null}
+              {!is3D && targetVectorId ? mapPois.filter((poi) => poi.id === targetVectorId).map((poi) => (
+                <Box
+                  key={`target-poi-${poi.id}`}
+                  sx={{
+                    position: "absolute",
+                    left: `${getCoordinatePercent(poi.x, mapWidth)}%`,
+                    top: `${getCoordinatePercent(poi.y, mapHeight)}%`,
+                    transform: "translate(-50%, -50%)",
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: "2px solid rgba(245, 158, 11, 0.95)",
+                    boxShadow: "0 0 0 6px rgba(245, 158, 11, 0.20)",
+                    pointerEvents: "none",
+                    zIndex: 2,
+                  }}
+                />
+              )) : null}
 
               {!is3D && selectedPlace ? (
                 <Box

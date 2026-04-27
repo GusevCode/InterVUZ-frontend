@@ -10,10 +10,21 @@ const MAP_PALETTE = {
   accent: "#b08968",
   stroke: "#5b4b3a",
   outline: "#3f2f21",
+  poi: "#f59e0b",
   hover: "#f59e0b",
   selected: "#22c55e",
   label: "rgba(47, 36, 26, 0.78)",
   labelElevated: "rgba(47, 36, 26, 0.9)",
+};
+
+const POI_COLORS = {
+  printer: "#f59e0b",
+  cafe: "#22c55e",
+  cafeteria: "#22c55e",
+  wc: "#3b82f6",
+  restroom: "#3b82f6",
+  info: "#a855f7",
+  other: "#f59e0b",
 };
 
 function buildSvgText(mapVector) {
@@ -79,6 +90,11 @@ function parseNumber(value, fallback = null) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function getPoiColor(type) {
+  const normalized = String(type ?? "").toLowerCase();
+  return POI_COLORS[normalized] ?? POI_COLORS.other;
+}
+
 function CameraRig({ width, height }) {
   const { camera, size } = useThree();
 
@@ -102,6 +118,7 @@ function CameraRig({ width, height }) {
 export default function Map3D({
   mapVector,
   selectedId,
+  targetId = "",
   onSelect,
   showLabels = true,
   onInteract,
@@ -110,6 +127,17 @@ export default function Map3D({
   const [hoveredId, setHoveredId] = useState(null);
   const sourceElements = useMemo(
     () => (mapVector?.elements ?? []).filter((element) => element?.d),
+    [mapVector],
+  );
+  const sourcePois = useMemo(
+    () => (mapVector?.pois ?? [])
+      .filter((poi) => poi?.id)
+      .map((poi) => ({
+        ...poi,
+        x: Number(poi.x),
+        y: Number(poi.y),
+      }))
+      .filter((poi) => Number.isFinite(poi.x) && Number.isFinite(poi.y)),
     [mapVector],
   );
   const svgText = useMemo(() => buildSvgText(mapVector), [mapVector]);
@@ -227,6 +255,17 @@ export default function Map3D({
     return new THREE.TubeGeometry(curve, segments, 2.2, 14, false);
   }, [routePoints, baseDepth]);
 
+  const poiMarkers = useMemo(() => (
+    sourcePois.map((poi) => ({
+      ...poi,
+      baseZ: baseDepth + 0.8,
+      radius: 2.2,
+      height: Math.max(20, roomDepth * 0.55),
+      color: getPoiColor(poi.type),
+      label: poi.title || poi.id,
+    }))
+  ), [sourcePois, baseDepth, roomDepth]);
+
   const meshes = useMemo(
     () => [...fillMeshes, ...strokeMeshes, ...outlineMeshes].concat(routeGeometry ? [{ geometry: routeGeometry }] : []),
     [fillMeshes, strokeMeshes, outlineMeshes, routeGeometry],
@@ -311,6 +350,74 @@ export default function Map3D({
 
     return accepted;
   }, [labelItems, selectedId, hoveredId, width, height, roomDepth]);
+
+  const poiLabels = useMemo(() => (
+    poiMarkers.map((poi) => ({
+      key: `poi-label-${poi.id}`,
+      id: poi.id,
+      label: poi.label,
+      x: poi.x,
+      y: poi.y,
+      z: poi.baseZ + poi.height + poi.radius + 1.8,
+    }))
+  ), [poiMarkers]);
+
+  const targetAnchor = useMemo(() => {
+    if (!targetId) {
+      return null;
+    }
+
+    for (const item of shapes) {
+      const id = item.element?.id ?? "";
+      if (id !== targetId) {
+        continue;
+      }
+
+      const points = item.shape.getSpacedPoints(80);
+      if (!points.length) {
+        continue;
+      }
+
+      let minXValue = Number.POSITIVE_INFINITY;
+      let maxXValue = Number.NEGATIVE_INFINITY;
+      let minYValue = Number.POSITIVE_INFINITY;
+      let maxYValue = Number.NEGATIVE_INFINITY;
+      let sumX = 0;
+      let sumY = 0;
+
+      points.forEach((point) => {
+        minXValue = Math.min(minXValue, point.x);
+        maxXValue = Math.max(maxXValue, point.x);
+        minYValue = Math.min(minYValue, point.y);
+        maxYValue = Math.max(maxYValue, point.y);
+        sumX += point.x;
+        sumY += point.y;
+      });
+
+      const widthValue = maxXValue - minXValue;
+      const heightValue = maxYValue - minYValue;
+      const markerRadius = Math.max(2.2, Math.min(8, Math.max(widthValue, heightValue) * 0.2));
+
+      return {
+        x: sumX / points.length,
+        y: sumY / points.length,
+        z: roomDepth + 7,
+        markerRadius,
+      };
+    }
+
+    const poi = poiMarkers.find((item) => item.id === targetId);
+    if (poi) {
+      return {
+        x: poi.x,
+        y: poi.y,
+        z: poi.baseZ + poi.height + poi.radius * 0.8,
+        markerRadius: Math.max(2.6, poi.radius * 1.15),
+      };
+    }
+
+    return null;
+  }, [targetId, shapes, roomDepth, poiMarkers]);
 
   useEffect(() => () => {
     meshes.forEach((mesh) => mesh.geometry.dispose());
@@ -403,6 +510,49 @@ export default function Map3D({
             </lineLoop>
           );
         })}
+        {poiMarkers.map((poi) => {
+          const isSelected = poi.id === selectedId;
+          const isHovered = poi.id === hoveredId;
+          const color = isSelected ? MAP_PALETTE.selected : isHovered ? MAP_PALETTE.hover : poi.color;
+
+          return (
+            <group
+              key={`poi-${poi.id}`}
+              position={[poi.x, poi.y, poi.baseZ]}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                handleSelect(poi.id);
+              }}
+              onPointerOver={(event) => {
+                event.stopPropagation();
+                setHoveredId(poi.id);
+              }}
+              onPointerOut={() => setHoveredId(null)}
+            >
+              <mesh castShadow receiveShadow position={[0, 0, poi.height * 0.5]}>
+                <cylinderGeometry args={[poi.radius, poi.radius, poi.height, 24]} />
+                <meshStandardMaterial
+                  color={color}
+                  emissive={color}
+                  emissiveIntensity={isSelected || isHovered ? 0.4 : 0.14}
+                  metalness={0.12}
+                  roughness={0.42}
+                />
+              </mesh>
+              <mesh position={[0, 0, poi.height + 0.25]}>
+                <circleGeometry args={[poi.radius * 0.7, 20]} />
+                <meshStandardMaterial
+                  color="#fff7ed"
+                  emissive={color}
+                  emissiveIntensity={isSelected || isHovered ? 0.9 : 0.45}
+                  metalness={0.04}
+                  roughness={0.35}
+                  side={THREE.DoubleSide}
+                />
+              </mesh>
+            </group>
+          );
+        })}
         {routeGeometry ? (
           <mesh geometry={routeGeometry} position={[0, 0, 0]}>
             <meshStandardMaterial
@@ -414,7 +564,31 @@ export default function Map3D({
             />
           </mesh>
         ) : null}
-        {showLabels ? visibleLabels.map((label) => (
+        {targetAnchor ? (
+          <>
+            <mesh position={[targetAnchor.x, targetAnchor.y, targetAnchor.z]}>
+              <sphereGeometry args={[targetAnchor.markerRadius * 0.42, 20, 20]} />
+              <meshStandardMaterial
+                color="#ef4444"
+                emissive="#ef4444"
+                emissiveIntensity={0.75}
+                metalness={0.08}
+                roughness={0.35}
+              />
+            </mesh>
+            <mesh position={[targetAnchor.x, targetAnchor.y, targetAnchor.z - 1]}>
+              <torusGeometry args={[targetAnchor.markerRadius, targetAnchor.markerRadius * 0.13, 14, 40]} />
+              <meshStandardMaterial
+                color="#fecaca"
+                emissive="#ef4444"
+                emissiveIntensity={0.5}
+                metalness={0.04}
+                roughness={0.45}
+              />
+            </mesh>
+          </>
+        ) : null}
+        {showLabels ? [...visibleLabels, ...poiLabels].map((label) => (
           <Html
             key={label.key}
             position={[label.x, label.y, label.z]}

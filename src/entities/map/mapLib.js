@@ -154,6 +154,19 @@ function normalizeMapVector(entryPath, data) {
   const viewBox = Array.isArray(data?.viewBox) ? data.viewBox : null;
   const width = Number(data?.width) || (viewBox?.[2] ? Number(viewBox[2]) : 0) || 0;
   const height = Number(data?.height) || (viewBox?.[3] ? Number(viewBox[3]) : 0) || 0;
+  const elements = Array.isArray(data?.elements) ? data.elements : [];
+  const pois = Array.isArray(data?.pois)
+    ? data.pois
+      .map((poi) => ({
+        ...poi,
+        x: Number(poi?.x),
+        y: Number(poi?.y),
+        id: String(poi?.id ?? "").trim(),
+        title: poi?.title ? String(poi.title) : "",
+        type: poi?.type ? String(poi.type) : "other",
+      }))
+      .filter((poi) => poi.id && Number.isFinite(poi.x) && Number.isFinite(poi.y))
+    : [];
 
   return {
     ...data,
@@ -161,6 +174,8 @@ function normalizeMapVector(entryPath, data) {
     label: data?.label ?? getVectorLabel(fileName),
     width,
     height,
+    elements,
+    pois,
   };
 }
 

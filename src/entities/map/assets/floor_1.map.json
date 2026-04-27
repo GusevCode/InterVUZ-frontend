@@ -311,8 +311,31 @@
       "fillOpacity": 0.376543
     }
   ],
+  "pois": [
+    {
+      "id": "poi-printer-01",
+      "title": "Принтер",
+      "type": "printer",
+      "x": 846.30634,
+      "y": 310.18018
+    },
+    {
+      "id": "poi-cafeteria-main",
+      "title": "Кафе",
+      "type": "cafeteria",
+      "x": 258.89026,
+      "y": 150.59464
+    },
+    {
+      "id": "path58",
+      "title": "path58",
+      "type": "other",
+      "x": 942.34235,
+      "y": 208.10811
+    }
+  ],
   "meta": {
     "source": "floor_1.svg",
-    "generatedAt": "2026-04-14T14:05:06.623Z"
+    "generatedAt": "2026-04-25T15:33:00.246Z"
   }
 }

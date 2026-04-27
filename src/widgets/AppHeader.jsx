@@ -24,6 +24,10 @@ function AppHeader() {
       currentTab = "/news";
     } else if (location.pathname.startsWith("/booking")) {
       currentTab = "/booking";
+    } else if (location.pathname.startsWith("/assistant")) {
+      currentTab = "/assistant";
+    } else if (location.pathname.startsWith("/booking")) {
+      currentTab = "/booking";
     }
 
     return ( 
@@ -55,6 +59,7 @@ function AppHeader() {
             }}
           >
             <Tab value="/map" label="Карта" />
+            <Tab value="/assistant" label="AI" />
             <Tab value="/schedule" label="Расписание" />
             <Tab value="/booking" label="Бронирование" />
             <Tab value="/news" label="Новости" />

@@ -23,9 +23,9 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="0.98111066"
-     inkscape:cx="691.05355"
-     inkscape:cy="235.95707"
+     inkscape:zoom="2.775"
+     inkscape:cx="372.79279"
+     inkscape:cy="159.45946"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="-8"
@@ -427,8 +427,8 @@
     <circle
        style="fill:#000aff;fill-opacity:0.376543"
        id="n_f1_002"
-       cx="336.23425"
-       cy="151.05405"
+       cx="335.06308"
+       cy="151.009"
        r="4"
        inkscape:label="n_f1_002">
       <title
@@ -446,9 +446,19 @@
     </circle>
     <circle
        style="fill:#000aff;fill-opacity:0.376543"
+       id="n_f1_012"
+       cx="322.13593"
+       cy="129.44618"
+       r="4"
+       inkscape:label="n_f1_012">
+      <title
+         id="title44-2-3-2">Вход в 106а</title>
+    </circle>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
        id="n_f1_003"
-       cx="459.15317"
-       cy="156.27928"
+       cx="459.06308"
+       cy="159.83784"
        r="4"
        inkscape:label="n_f1_003">
       <title
@@ -597,5 +607,69 @@
       <title
          id="title55">n_f1_011-&gt;n_f1_006</title>
     </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 396.48942,207.92762 62.68406,-51.47228 z"
+       id="n_f1_001-_n_f1_003"
+       inkscape:label="n_f1_001-&gt;n_f1_003">
+      <title
+         id="title56">n_f1_001-&gt;n_f1_003</title>
+    </path>
+    <path
+       style="fill:#000aff;fill-opacity:0.376543"
+       d="m 236.21189,176.07596 85.61725,-46.88564 z"
+       id="n_f1_010-_n_f1_012"
+       inkscape:label="n_f1_010-_n_f1_012">
+      <title
+         id="title61">n_f1_010-_n_f1_012</title>
+    </path>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer3"
+     inkscape:label="pois">
+    <ellipse
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="poi-printer-01"
+       cx="846.30634"
+       cy="310.18018"
+       rx="3.2432432"
+       ry="2.9729729"
+       inkscape:label="poi-printer-01">
+      <title
+         id="title57">Принтер</title>
+    </ellipse>
+    <circle
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="poi-cafeteria-main"
+       cx="258.89026"
+       cy="150.59464"
+       r="3.8221989"
+       inkscape:label="poi-cafeteria-main">
+      <title
+         id="title58">Кафе</title>
+    </circle>
+    <ellipse
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="poi-cafeteria-02"
+       cx="942.34235"
+       cy="208.10811"
+       rx="4.3243241"
+       ry="4.5045047"
+       inkscape:label="poi-cafeteria-02">
+      <title
+         id="title59">Кафе</title>
+    </ellipse>
+    <ellipse
+       style="fill:#000aff;fill-opacity:0.376543"
+       id="poi-office-01"
+       cx="846.66669"
+       cy="270.81082"
+       rx="4.1441441"
+       ry="3.4234235"
+       inkscape:label="poi-office-01">
+      <title
+         id="title60">Канцелярский магазин</title>
+    </ellipse>
   </g>
 </svg>

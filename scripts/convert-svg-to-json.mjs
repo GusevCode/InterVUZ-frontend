@@ -244,6 +244,36 @@ function pointsToPath(points, closePath) {
   return segments.join(" ");
 }
 
+function getPointsCenter(points) {
+  if (!Array.isArray(points) || points.length === 0) {
+    return null;
+  }
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  points.forEach(([x, y]) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null;
+  }
+
+  return {
+    x: minX + (maxX - minX) / 2,
+    y: minY + (maxY - minY) / 2,
+  };
+}
+
 function normalizePaint(value) {
   if (value === undefined || value === null) {
     return null;
@@ -476,6 +506,7 @@ const elements = [];
 const warnings = [];
 const graphNodes = [];
 const graphEdges = [];
+const poiItems = [];
 let graphEnabled = false;
 
 function shouldSkip(style) {
@@ -530,8 +561,37 @@ function getLayerKind(attrs, currentKind) {
   if (label === "edges" || label.includes("edges") || label.includes("routes")) {
     return "edges";
   }
+  if (label === "poi" || label === "pois" || label.includes("poi") || label.includes("interest")) {
+    return "pois";
+  }
 
   return currentKind;
+}
+
+function parsePoiType(id, title) {
+  const source = String(id || title || "").toLowerCase();
+  const match = source.match(/^poi[-_]?([a-z0-9]+)/i) || source.match(/(?:poi[-_])([a-z0-9]+)/i);
+  return match?.[1] || "other";
+}
+
+function addPoi({ id, x, y, title }) {
+  if (!id) {
+    warnings.push("POI without id was ignored.");
+    return;
+  }
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    warnings.push(`POI ${id} has invalid coordinates.`);
+    return;
+  }
+
+  poiItems.push({
+    id,
+    title: title || id,
+    type: parsePoiType(id, title),
+    x,
+    y,
+  });
 }
 
 function addGraphNode({ id, x, y, title }) {
@@ -592,6 +652,18 @@ function collect(nodes, inheritedStyle, layerKind) {
     }
 
     if (tag === "path") {
+      if (nextLayerKind === "pois") {
+        const { points } = parsePathPoints(attrs.d);
+        const center = getPointsCenter(points);
+        addPoi({
+          id: attrs.id,
+          x: center?.x,
+          y: center?.y,
+          title,
+        });
+        return;
+      }
+
       if (nextLayerKind === "edges") {
         const { points, hasUnsupported } = parsePathPoints(attrs.d);
         const endpoints = parseEdgeEndpoints(attrs["inkscape:label"] ?? attrs.label ?? attrs.id ?? title);
@@ -618,6 +690,20 @@ function collect(nodes, inheritedStyle, layerKind) {
     }
 
     if (tag === "rect") {
+      if (nextLayerKind === "pois") {
+        const x = parseNumber(attrs.x) ?? 0;
+        const y = parseNumber(attrs.y) ?? 0;
+        const width = parseNumber(attrs.width) ?? 0;
+        const height = parseNumber(attrs.height) ?? 0;
+        addPoi({
+          id: attrs.id,
+          x: x + width / 2,
+          y: y + height / 2,
+          title,
+        });
+        return;
+      }
+
       if (nextLayerKind === "nodes") {
         const x = parseNumber(attrs.x) ?? 0;
         const y = parseNumber(attrs.y) ?? 0;
@@ -650,6 +736,16 @@ function collect(nodes, inheritedStyle, layerKind) {
     }
 
     if (tag === "circle") {
+      if (nextLayerKind === "pois") {
+        addPoi({
+          id: attrs.id,
+          x: parseNumber(attrs.cx),
+          y: parseNumber(attrs.cy),
+          title,
+        });
+        return;
+      }
+
       if (nextLayerKind === "nodes") {
         graphEnabled = true;
         addGraphNode({
@@ -671,6 +767,16 @@ function collect(nodes, inheritedStyle, layerKind) {
     }
 
     if (tag === "ellipse") {
+      if (nextLayerKind === "pois") {
+        addPoi({
+          id: attrs.id,
+          x: parseNumber(attrs.cx),
+          y: parseNumber(attrs.cy),
+          title,
+        });
+        return;
+      }
+
       if (nextLayerKind === "nodes") {
         graphEnabled = true;
         addGraphNode({
@@ -692,6 +798,20 @@ function collect(nodes, inheritedStyle, layerKind) {
     }
 
     if (tag === "line") {
+      if (nextLayerKind === "pois") {
+        const x1 = parseNumber(attrs.x1);
+        const y1 = parseNumber(attrs.y1);
+        const x2 = parseNumber(attrs.x2);
+        const y2 = parseNumber(attrs.y2);
+        addPoi({
+          id: attrs.id,
+          x: Number.isFinite(x1) && Number.isFinite(x2) ? (x1 + x2) / 2 : null,
+          y: Number.isFinite(y1) && Number.isFinite(y2) ? (y1 + y2) / 2 : null,
+          title,
+        });
+        return;
+      }
+
       if (nextLayerKind === "edges") {
         const points = [
           [parseNumber(attrs.x1), parseNumber(attrs.y1)],
@@ -723,6 +843,17 @@ function collect(nodes, inheritedStyle, layerKind) {
     }
 
     if (tag === "polyline") {
+      if (nextLayerKind === "pois") {
+        const center = getPointsCenter(parsePoints(attrs.points));
+        addPoi({
+          id: attrs.id,
+          x: center?.x,
+          y: center?.y,
+          title,
+        });
+        return;
+      }
+
       if (nextLayerKind === "edges") {
         const endpoints = parseEdgeEndpoints(attrs["inkscape:label"] ?? attrs.label ?? attrs.id ?? title);
         graphEnabled = true;
@@ -745,6 +876,17 @@ function collect(nodes, inheritedStyle, layerKind) {
     }
 
     if (tag === "polygon") {
+      if (nextLayerKind === "pois") {
+        const center = getPointsCenter(parsePoints(attrs.points));
+        addPoi({
+          id: attrs.id,
+          x: center?.x,
+          y: center?.y,
+          title,
+        });
+        return;
+      }
+
       if (nextLayerKind === "edges") {
         const endpoints = parseEdgeEndpoints(attrs["inkscape:label"] ?? attrs.label ?? attrs.id ?? title);
         graphEnabled = true;
@@ -780,6 +922,7 @@ const output = {
   height,
   viewBox: rootViewBox ? [rootViewBox.minX, rootViewBox.minY, rootViewBox.width, rootViewBox.height] : null,
   elements,
+  pois: poiItems,
   meta: {
     source: path.basename(inputPath),
     generatedAt: new Date().toISOString(),
@@ -789,7 +932,7 @@ const output = {
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
 
-console.log(`Saved ${elements.length} elements to ${outputPath}`);
+console.log(`Saved ${elements.length} elements and ${poiItems.length} POIs to ${outputPath}`);
 if (graphEnabled) {
   const graphOutput = {
     version: 1,

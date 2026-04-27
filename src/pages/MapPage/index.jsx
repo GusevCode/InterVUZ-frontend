@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   buildRoute,
   getAvailableFloors,
@@ -56,7 +57,99 @@ function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
 
+function normalizeId(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function extractRoomToken(value) {
+  const normalized = normalizeId(value).replaceAll("_", "-");
+  const roomMatch = normalized.match(/(?:room-)?(\d+[\p{L}]?)/iu);
+  return roomMatch?.[1] ?? "";
+}
+
+function findMatchingElementId(elements, rawId) {
+  const normalizedRaw = normalizeId(rawId);
+  if (!normalizedRaw) {
+    return "";
+  }
+
+  const exact = (elements ?? []).find((item) => normalizeId(item?.id) === normalizedRaw);
+  if (exact?.id) {
+    return exact.id;
+  }
+
+  const roomToken = extractRoomToken(normalizedRaw);
+  if (!roomToken) {
+    return "";
+  }
+
+  const byRoomCode = (elements ?? []).find((item) => {
+    const elementId = normalizeId(item?.id);
+    return elementId === `room-${roomToken}` || elementId.endsWith(`-${roomToken}`);
+  });
+
+  return byRoomCode?.id ?? "";
+}
+
+function findMatchingPlaceId(placeItems, rawId) {
+  const normalizedRaw = normalizeId(rawId);
+  if (!normalizedRaw) {
+    return "";
+  }
+
+  const exact = (placeItems ?? []).find((item) => normalizeId(item?.id) === normalizedRaw);
+  if (exact?.id) {
+    return exact.id;
+  }
+
+  const roomToken = extractRoomToken(normalizedRaw);
+  if (!roomToken) {
+    return "";
+  }
+
+  const byName = (placeItems ?? []).find((item) => {
+    const nameToken = extractRoomToken(item?.name ?? "");
+    return nameToken === roomToken;
+  });
+
+  return byName?.id ?? "";
+}
+
+function findMatchingPoiId(pois, rawId) {
+  const normalizedRaw = normalizeId(rawId);
+  if (!normalizedRaw) {
+    return "";
+  }
+
+  const exact = (pois ?? []).find((poi) => normalizeId(poi?.id) === normalizedRaw);
+  if (exact?.id) {
+    return exact.id;
+  }
+
+  const roomToken = extractRoomToken(normalizedRaw);
+  if (!roomToken) {
+    return "";
+  }
+
+  const byRoomToken = (pois ?? []).find((poi) => {
+    const poiId = normalizeId(poi?.id);
+    const poiTitle = normalizeId(poi?.title);
+    return poiId.includes(roomToken) || poiTitle.includes(roomToken);
+  });
+
+  return byRoomToken?.id ?? "";
+}
+
+function findMatchingMapObjectId(mapVector, rawId) {
+  const elementId = findMatchingElementId(mapVector?.elements, rawId);
+  if (elementId) {
+    return elementId;
+  }
+  return findMatchingPoiId(mapVector?.pois, rawId);
+}
+
 function MapPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [floors, setFloors] = useState([]);
   const [selectedFloorId, setSelectedFloorId] = useState("");
   const [mapImage, setMapImage] = useState(null);
@@ -72,6 +165,8 @@ function MapPage() {
   const [accessibleOnly, setAccessibleOnly] = useState(false);
   const [route, setRoute] = useState(null);
   const [selectedVectorId, setSelectedVectorId] = useState("");
+  const [targetVectorId, setTargetVectorId] = useState("");
+  const [targetPlaceId, setTargetPlaceId] = useState("");
   const [showLabels, setShowLabels] = useState(true);
   const [localRoutePoints, setLocalRoutePoints] = useState([]);
   const [routeError, setRouteError] = useState("");
@@ -84,6 +179,9 @@ function MapPage() {
   const [isBuildingRoute, setIsBuildingRoute] = useState(false);
   const [error, setError] = useState("");
   const [mapWarning, setMapWarning] = useState("");
+  const assistantMapId = searchParams.get("assistantMapId") ?? "";
+  const assistantPlaceId = searchParams.get("assistantPlaceId") ?? "";
+  const assistantElementId = searchParams.get("assistantElementId") ?? "";
 
   useEffect(() => {
     let isMounted = true;
@@ -191,6 +289,69 @@ function MapPage() {
   }, [selectedMapId, mapVectors, mapGraphs]);
 
   useEffect(() => {
+    if (!assistantMapId || mapVectors.length === 0) {
+      return;
+    }
+
+    const matched = mapVectors.find((item) => {
+      if (item.id === assistantMapId) {
+        return true;
+      }
+      return getMapBaseName(item.id) === getMapBaseName(assistantMapId);
+    });
+
+    if (!matched) {
+      return;
+    }
+
+    setSelectedMapId(matched.id);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("assistantMapId");
+    setSearchParams(nextParams, { replace: true });
+  }, [assistantMapId, mapVectors, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!assistantPlaceId || places.length === 0) {
+      return;
+    }
+
+    const matchedPlaceId = findMatchingPlaceId(places, assistantPlaceId);
+    if (!matchedPlaceId) {
+      return;
+    }
+
+    setSelectedPlaceId(matchedPlaceId);
+    setTargetPlaceId(matchedPlaceId);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("assistantPlaceId");
+    setSearchParams(nextParams, { replace: true });
+  }, [assistantPlaceId, places, searchParams, setSearchParams]);
+  useEffect(() => {
+    if (!mapVector) {
+      return;
+    }
+
+    const matchedByElementId = findMatchingMapObjectId(mapVector, assistantElementId);
+    const matchedByPlaceId = matchedByElementId
+      ? ""
+      : findMatchingMapObjectId(mapVector, assistantPlaceId);
+    const matchedElementId = matchedByElementId || matchedByPlaceId;
+
+    if (!matchedElementId) {
+      return;
+    }
+
+    setSelectedVectorId(matchedElementId);
+    setTargetVectorId(matchedElementId);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("assistantElementId");
+    if (matchedByPlaceId) {
+      nextParams.delete("assistantPlaceId");
+    }
+    setSearchParams(nextParams, { replace: true });
+  }, [assistantElementId, assistantPlaceId, mapVector, searchParams, setSearchParams]);
+
+  useEffect(() => {
     if (!selectedPlaceId || !mapVector) {
       return;
     }
@@ -202,20 +363,30 @@ function MapPage() {
       return;
     }
 
-    const match = place.name.match(/(\d+[а-яёa-z]*)$/i);
+    const match = place.name.match(/(\d+[\u0430-\u044f\u0451a-z]*)$/i);
 
     if (!match) {
       setSelectedVectorId("");
       return;
     }
 
-    const cyrillicToLatin = { "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e" };
-    const roomCode = match[1].toLowerCase().replace(/[а-яё]/g, (ch) => cyrillicToLatin[ch] ?? ch);
+    const cyrillicToLatin = {
+      "\u0430": "a",
+      "\u0431": "b",
+      "\u0432": "v",
+      "\u0433": "g",
+      "\u0434": "d",
+      "\u0435": "e",
+    };
+    const roomCode = match[1].toLowerCase().replace(/[\u0430-\u044f\u0451]/g, (ch) => cyrillicToLatin[ch] ?? ch);
     const vectorId = `room-${roomCode}`;
     const elementExists = (mapVector.elements ?? []).some((el) => el.id === vectorId);
 
     setSelectedVectorId(elementExists ? vectorId : "");
-  }, [selectedPlaceId, places, mapVector]);
+    if (selectedPlaceId === targetPlaceId) {
+      setTargetVectorId(elementExists ? vectorId : "");
+    }
+  }, [selectedPlaceId, places, mapVector, targetPlaceId]);
 
   useEffect(() => {
     if (!selectedFloorId) {
@@ -321,6 +492,7 @@ function MapPage() {
   const isLoading = isLoadingFloors || isLoadingMap;
   const mapWidth = mapVector?.width || mapImage?.width || 100;
   const mapHeight = mapVector?.height || mapImage?.height || 100;
+  const mapPois = Array.isArray(mapVector?.pois) ? mapVector.pois : [];
   const hasMapAsset = Boolean(mapImage || mapVector);
   const is3D = Boolean(mapVector);
   const isRouteDisabled = !routeFromPlaceId || !routeToPlaceId || routeFromPlaceId === routeToPlaceId || isBuildingRoute;
@@ -355,6 +527,8 @@ function MapPage() {
 
       setRoute(nextRoute);
       setSelectedPlaceId(routeToPlaceId);
+      setTargetPlaceId(routeToPlaceId);
+      setTargetVectorId("");
     } catch (buildError) {
       setRoute(null);
       setRouteError(buildError.message || "Не удалось построить маршрут.");
@@ -397,12 +571,15 @@ function MapPage() {
       formatPlaceType={formatPlaceType}
       mapImage={mapImage}
       mapVector={mapVector}
+      mapPois={mapPois}
       mapVectors={mapVectors}
       selectedMapId={selectedMapId}
       setSelectedMapId={setSelectedMapId}
       mapGraph={mapGraph}
       selectedVectorId={selectedVectorId}
       setSelectedVectorId={setSelectedVectorId}
+      targetVectorId={targetVectorId}
+      targetPlaceId={targetPlaceId}
       showLabels={showLabels}
       setShowLabels={setShowLabels}
       localRoutePoints={localRoutePoints}
