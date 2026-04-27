@@ -57,8 +57,8 @@ else
   git -C "$REPO_DIR" checkout -b "$BRANCH" --track "origin/$BRANCH"
 fi
 
-log "Pulling latest commits..."
-git -C "$REPO_DIR" pull --ff-only origin "$BRANCH"
+log "Resetting local branch to origin/$BRANCH..."
+git -C "$REPO_DIR" reset --hard "origin/$BRANCH"
 
 log "Installing dependencies..."
 cd "$REPO_DIR"
