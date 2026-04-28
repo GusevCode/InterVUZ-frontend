@@ -319,9 +319,6 @@ export default function MapRoutePlanner({ graph, onRouteChange, dark = false }) 
         Найти кратчайший путь
       </Button>
       {error ? <Alert severity="error">{error}</Alert> : null}
-      <Box sx={{ color: dark ? D.labelColor : "text.secondary", fontSize: 12 }}>
-        Совет: добавьте узлы в *.graph.json и соедините их рёбрами.
-      </Box>
     </Stack>
   );
 }
