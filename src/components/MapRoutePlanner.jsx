@@ -239,11 +239,7 @@ export default function MapRoutePlanner({ graph, onRouteChange, dark = false }) 
   }
 
   if (!graph || nodes.length === 0) {
-    return (
-      <Alert severity="warning">
-        Нет файла маршрутов (*.graph.json) или он пустой.
-      </Alert>
-    );
+    return null;
   }
 
   const inputSx = dark

@@ -6,9 +6,6 @@ import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
 import Grid from "@mui/material/Grid";
-import List from "@mui/material/List";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -476,40 +473,17 @@ function MapPageView({
                 </Box>
               ) : null}
 
-              <Box>
-                <Typography variant="subtitle2" gutterBottom>
-                  Этажи
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {floors.map((floor) => (
-                    <Chip
-                      key={floor.id}
-                      label={floor.label}
-                      clickable
-                      color={floor.id === selectedFloorId ? "primary" : "default"}
-                      variant={floor.id === selectedFloorId ? "filled" : "outlined"}
-                      onClick={() => setSelectedFloorId(floor.id)}
-                    />
-                  ))}
-                </Stack>
-              </Box>
 
-              {selectedFloor ? (
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  <Chip label={`Корпус ${selectedFloor.building}`} size="small" />
-                  <Chip label={`Этаж ${selectedFloor.label}`} size="small" />
-                  <Chip label={`Точек: ${places.length}`} size="small" color="primary" variant="outlined" />
-                </Stack>
+              {mapGraph ? (
+                <>
+                  <Divider />
+                  <MapRoutePlanner
+                    graph={mapGraph}
+                    onRouteChange={setLocalRoutePoints}
+                  />
+                  <Divider />
+                </>
               ) : null}
-
-              <Divider />
-
-              <MapRoutePlanner
-                graph={mapGraph}
-                onRouteChange={setLocalRoutePoints}
-              />
-
-              <Divider />
 
               {isLoading ? (
                 <Stack direction="row" spacing={1.5} alignItems="center">
@@ -525,34 +499,6 @@ function MapPageView({
                 <Alert severity="warning">Бэкенд не вернул доступные этажи через `/places`.</Alert>
               ) : null}
 
-              {!isLoading && !error && places.length > 0 ? (
-                <List sx={{ p: 0 }}>
-                  {places.map((place) => {
-                    const isSelected = place.id === selectedPlaceId;
-
-                    return (
-                      <ListItemButton
-                        key={place.id}
-                        selected={isSelected}
-                        onClick={() => setSelectedPlaceId(place.id)}
-                        sx={{
-                          px: 1,
-                          py: 1.25,
-                          borderRadius: 2,
-                          mb: 0.5,
-                          alignItems: "flex-start",
-                        }}
-                      >
-                        <ListItemText
-                          primary={place.name}
-                          secondary={`${formatPlaceType(place.type)} - x:${place.coordinates.x}, y:${place.coordinates.y}`}
-                          primaryTypographyProps={{ fontWeight: isSelected ? 700 : 500 }}
-                        />
-                      </ListItemButton>
-                    );
-                  })}
-                </List>
-              ) : null}
 
               {!isLoading && !error && selectedFloor && places.length === 0 ? (
                 <Alert severity="warning">Для выбранного этажа бэкенд не вернул точек.</Alert>

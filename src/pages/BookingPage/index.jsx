@@ -1,11 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addBookingDuration,
   cancelBooking,
   createBooking,
   fetchBookings,
   fetchRooms,
+  peekBookingsCache,
 } from "../../entities/booking/bookingApi";
+import {
+  filterFioInput,
+  formatPhoneInput,
+  isValidFio,
+  isValidPhone,
+} from "../../shared/bookingForm";
+import { ALL_ROOMS_ID } from "../../shared/ui/RoomAutocomplete";
 import BookingPageView from "./BookingPageView";
 
 
@@ -30,15 +38,22 @@ function BookingPage() {
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const requestIdRef = useRef(0);
   const [submitting, setSubmitting] = useState(false);
 
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [timeStart, setTimeStart] = useState("09:00");
   const [timeEnd, setTimeEnd] = useState("10:30");
-  const [bookedBy, setBookedBy] = useState("");
-  const [purpose, setPurpose] = useState("");
+  const [bookedBy, setBookedBy] = useState(() =>
+    filterFioInput(localStorage.getItem("booking_bookedBy") ?? "")
+  );
+  const [purpose, setPurpose] = useState(() => {
+    const stored = localStorage.getItem("booking_purpose") ?? "";
+    return stored ? formatPhoneInput(stored) : "";
+  });
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({ bookedBy: "", contact: "" });
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
@@ -49,21 +64,51 @@ function BookingPage() {
       .catch(() => {});
   }, []);
 
+  const handleSetBookedBy = useCallback((v) => {
+    const next = filterFioInput(v);
+    setBookedBy(next);
+    localStorage.setItem("booking_bookedBy", next);
+    setFieldErrors((prev) => (prev.bookedBy ? { ...prev, bookedBy: "" } : prev));
+  }, []);
+
+  const handleSetPurpose = useCallback((v) => {
+    const next = formatPhoneInput(v);
+    setPurpose(next);
+    localStorage.setItem("booking_purpose", next);
+    setFieldErrors((prev) => (prev.contact ? { ...prev, contact: "" } : prev));
+  }, []);
+
   // Reload bookings whenever filter changes
+  const isAllRooms = selectedRoomId === ALL_ROOMS_ID;
+
   const loadBookings = useCallback(async () => {
-    setLoadingBookings(true);
+    const params = {
+      roomId:
+        selectedRoomId && !isAllRooms ? selectedRoomId : undefined,
+      date: selectedDate || undefined,
+    };
+
+    const cached = peekBookingsCache(params);
+    if (cached) {
+      setBookings(cached);
+    }
+
+    const id = ++requestIdRef.current;
+    if (!cached) {
+      setLoadingBookings(true);
+    }
+
     try {
-      const res = await fetchBookings({
-        roomId: selectedRoomId || undefined,
-        date: selectedDate || undefined,
-      });
+      const res = await fetchBookings(params);
+      if (id !== requestIdRef.current) return;
       setBookings(res?.data ?? []);
     } catch {
-      setBookings([]);
+      if (id !== requestIdRef.current) return;
+      if (!cached) setBookings([]);
     } finally {
-      setLoadingBookings(false);
+      if (id === requestIdRef.current) setLoadingBookings(false);
     }
-  }, [selectedRoomId, selectedDate]);
+  }, [selectedRoomId, selectedDate, isAllRooms]);
 
   useEffect(() => {
     void loadBookings();
@@ -91,13 +136,30 @@ function BookingPage() {
 
   const handleBook = async () => {
     setError("");
+    setFieldErrors({ bookedBy: "", contact: "" });
     setSuccess("");
 
-    if (!selectedRoomId) { setError("Выберите аудиторию."); return; }
-    if (!selectedDate)   { setError("Укажите дату."); return; }
-    if (!timeStart) { setError("Укажите время начала."); return; }
-    if (!bookedBy.trim()) { setError("Укажите имя."); return; }
-    if (!purpose.trim()) { setError("Укажите контакт."); return; }
+    if (!selectedRoomId || isAllRooms) {
+      setError("Выберите конкретную аудиторию");
+      return;
+    }
+    if (!selectedDate)   { setError("Укажите дату"); return; }
+    if (!timeStart) { setError("Укажите время начала"); return; }
+
+    const nextFieldErrors = {};
+    if (!isValidFio(bookedBy)) {
+      nextFieldErrors.bookedBy =
+        "Укажите ФИО (до 30 символов, только буквы, точки и дефис)";
+    }
+    if (!purpose.trim()) {
+      nextFieldErrors.contact = "Укажите номер телефона";
+    } else if (!isValidPhone(purpose)) {
+      nextFieldErrors.contact = "Введите номер в формате +7 (999) 123-45-67";
+    }
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -111,8 +173,6 @@ function BookingPage() {
         booker_contact: purpose.trim(),
       });
       setSuccess(`Аудитория успешно забронирована на ${timeStart}–${fixedTimeEnd}!`);
-      setBookedBy("");
-      setPurpose("");
       await loadBookings();
     } catch (err) {
       setError(err.message || "Не удалось создать бронирование.");
@@ -122,8 +182,12 @@ function BookingPage() {
   };
 
   const handleCancel = async (id) => {
+    const booking = bookings.find((b) => b.id === id);
     try {
-      await cancelBooking(id);
+      await cancelBooking(id, {
+        date: booking?.date ?? selectedDate,
+        roomId: booking?.room_id,
+      });
       await loadBookings();
     } catch (err) {
       setError(err.message || "Не удалось отменить бронирование.");
@@ -135,22 +199,34 @@ function BookingPage() {
       rooms={rooms}
       timeSlots={TIME_SLOTS}
       selectedRoomId={selectedRoomId}
-      setSelectedRoomId={(v) => { setSelectedRoomId(v); setError(""); setSuccess(""); }}
+      setSelectedRoomId={(v) => {
+        setSelectedRoomId(v);
+        setError("");
+        setFieldErrors({ bookedBy: "", contact: "" });
+        setSuccess("");
+      }}
       selectedDate={selectedDate}
-      setSelectedDate={(v) => { setSelectedDate(v); setError(""); setSuccess(""); }}
+      setSelectedDate={(v) => {
+        setSelectedDate(v);
+        setError("");
+        setFieldErrors({ bookedBy: "", contact: "" });
+        setSuccess("");
+      }}
       timeStart={timeStart}
       setTimeStart={setTimeStart}
       timeEnd={timeEnd}
       setTimeEnd={() => {}}
       bookedBy={bookedBy}
-      setBookedBy={setBookedBy}
+      setBookedBy={handleSetBookedBy}
       purpose={purpose}
-      setPurpose={setPurpose}
+      setPurpose={handleSetPurpose}
       error={error}
+      fieldErrors={fieldErrors}
       success={success}
       handleBook={handleBook}
       submitting={submitting}
       handleCancel={handleCancel}
+      bookingDisabled={isAllRooms}
       filteredBookings={sortedBookings}
       loadingBookings={loadingBookings}
       roomMap={roomMap}

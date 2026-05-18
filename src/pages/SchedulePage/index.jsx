@@ -3,6 +3,7 @@ import {
   fetchGroupSchedule,
   fetchScheduleGroups,
 } from "../../entities/shedule/scheduleApi";
+import { resolveGroupId } from "../../shared/scheduleForm";
 import SchedulePageView from "./SchedulePageView";
 
 const dayNames = {
@@ -23,6 +24,7 @@ function getTodayScheduleDay() {
 function SchedulePage() {
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [groupQuery, setGroupQuery] = useState("");
   const [events, setEvents] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -93,21 +95,32 @@ function SchedulePage() {
   };
 
   const handleShowSchedule = async () => {
-    if (!selectedGroupId) {
-      const loadedGroups = await loadGroups();
-      if (loadedGroups.length > 0) {
-        setError("Выберите группу и повторите попытку.");
+    let groupsList = groups;
+    let groupId = resolveGroupId(groupsList, selectedGroupId, groupQuery);
+
+    if (!groupId) {
+      groupsList = await loadGroups();
+      groupId = resolveGroupId(groupsList, selectedGroupId, groupQuery);
+    }
+
+    if (!groupId) {
+      if (groupsList.length > 0) {
+        setError("Выберите группу из списка или введите точное название");
       } else {
-        setError("Список групп недоступен. Повторите попытку позже.");
+        setError("Список групп недоступен, повторите попытку позже");
       }
       return;
+    }
+
+    if (groupId !== selectedGroupId) {
+      setSelectedGroupId(groupId);
     }
 
     setLoadingSchedule(true);
     setError("");
 
     try {
-      const response = await fetchGroupSchedule(selectedGroupId);
+      const response = await fetchGroupSchedule(groupId);
       setEvents(response?.data?.schedule ?? []);
       setScheduleLoaded(true);
     } catch (err) {
@@ -128,6 +141,8 @@ function SchedulePage() {
     <SchedulePageView
       selectedGroupId={selectedGroupId}
       setSelectedGroupId={setSelectedGroupId}
+      groupQuery={groupQuery}
+      setGroupQuery={setGroupQuery}
       groups={groups}
       handleShowSchedule={handleShowSchedule}
       loadingSchedule={loadingSchedule}

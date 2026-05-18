@@ -289,6 +289,24 @@ function MapPage() {
   }, [selectedMapId, mapVectors, mapGraphs]);
 
   useEffect(() => {
+    if (!selectedMapId || floors.length === 0) {
+      return;
+    }
+
+    const baseName = getMapBaseName(selectedMapId);
+    const floorMatch = baseName.match(/floor[_-]?(\d+)/i);
+    if (!floorMatch) {
+      return;
+    }
+
+    const floorNum = Number(floorMatch[1]);
+    const matchedFloor = floors.find((f) => f.floor === floorNum);
+    if (matchedFloor && matchedFloor.id !== selectedFloorId) {
+      setSelectedFloorId(matchedFloor.id);
+    }
+  }, [selectedMapId, floors]);
+
+  useEffect(() => {
     if (!assistantMapId || mapVectors.length === 0) {
       return;
     }
@@ -387,6 +405,41 @@ function MapPage() {
       setTargetVectorId(elementExists ? vectorId : "");
     }
   }, [selectedPlaceId, places, mapVector, targetPlaceId]);
+
+  useEffect(() => {
+    if (!selectedVectorId || places.length === 0) {
+      return;
+    }
+
+    const cyrillicToLatin = {
+      "\u0430": "a",
+      "\u0431": "b",
+      "\u0432": "v",
+      "\u0433": "g",
+      "\u0434": "d",
+      "\u0435": "e",
+    };
+
+    const rawToken = selectedVectorId.replace(/^room-/i, "").toLowerCase();
+    if (!rawToken) {
+      return;
+    }
+
+    const matched = places.find((place) => {
+      const match = place.name.match(/(\d+[\u0430-\u044f\u0451a-z]*)$/i);
+      if (!match) {
+        return false;
+      }
+      const placeCode = match[1]
+        .toLowerCase()
+        .replace(/[\u0430-\u044f\u0451]/g, (ch) => cyrillicToLatin[ch] ?? ch);
+      return placeCode === rawToken;
+    });
+
+    if (matched && matched.id !== selectedPlaceId) {
+      setSelectedPlaceId(matched.id);
+    }
+  }, [selectedVectorId, places]);
 
   useEffect(() => {
     if (!selectedFloorId) {
