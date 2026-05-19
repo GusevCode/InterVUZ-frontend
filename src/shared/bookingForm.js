@@ -70,6 +70,18 @@ export function formatPhoneInput(value) {
   return formatted;
 }
 
+export function buildBookingUrl({ roomId, date } = {}) {
+  const params = new URLSearchParams();
+  if (roomId) {
+    params.set("roomId", String(roomId));
+  }
+  if (date) {
+    params.set("date", String(date));
+  }
+  const query = params.toString();
+  return query ? `/booking?${query}` : "/booking";
+}
+
 export function formatRoomNumber(name, fallback = "") {
   if (!name) return fallback;
   const trimmed = String(name).trim();

@@ -1,5 +1,6 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
@@ -10,8 +11,12 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { useNavigate } from "react-router-dom";
 import Map3D from "../../components/Map3D";
+import { buildBookingUrl } from "../../shared/bookingForm";
 import MapRoutePlanner from "../../components/MapRoutePlanner";
+import MapMultiFloorRouteView from "../../components/MapMultiFloorRouteView";
+import FloorChipSlider from "../../shared/ui/FloorChipSlider";
 
 const M = {
   labelColor: "#AFBFDE",
@@ -27,6 +32,7 @@ function MobileMapView({
   mapWarning,
   mapImage,
   mapVector,
+  mapVectors,
   mapPois,
   is3D,
   hasMapAsset,
@@ -35,7 +41,7 @@ function MobileMapView({
   targetPlaceId,
   setSelectedVectorId,
   showLabels,
-  localRoutePoints,
+  displayRoutePoints,
   mapWidth,
   mapHeight,
   routePoints,
@@ -45,6 +51,17 @@ function MobileMapView({
   selectedPlaceId,
   setSelectedPlaceId,
   mapGraph,
+  mapGraphs,
+  floorConnections,
+  multiFloorRoute,
+  setMultiFloorRoute,
+  hasMultiFloorRoute,
+  routeSegments,
+  routeSegmentIndex,
+  onSelectRouteSegment,
+  handleSelectMap,
+  handleSelectFloor,
+  handleRouteFloorChange,
   setLocalRoutePoints,
   routeFromPlaceId,
   routeToPlaceId,
@@ -63,7 +80,7 @@ function MobileMapView({
           border: "1px dashed #3D5683",
           borderRadius: "18px",
           overflow: "hidden",
-          aspectRatio: hasMapAsset ? `${mapWidth} / ${mapHeight}` : "4 / 3",
+          aspectRatio: hasMultiFloorRoute ? "auto" : hasMapAsset ? `${mapWidth} / ${mapHeight}` : "4 / 3",
           position: "relative",
           bgcolor: is3D ? "transparent" : mapImage ? "#0a1222" : "transparent",
           display: "flex",
@@ -94,7 +111,7 @@ function MobileMapView({
               targetId={targetVectorId}
               onSelect={setSelectedVectorId}
               showLabels={showLabels}
-              routePoints={localRoutePoints}
+              routePoints={displayRoutePoints}
             />
             {showLabels && selectedVectorId ? (
               <Box
@@ -277,25 +294,39 @@ function MobileMapView({
         )}
       </Box>
 
-      {/* Floor chips */}
-      {floors.length > 0 ? (
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {floors.map((floor) => (
-            <Chip
-              key={floor.id}
-              label={floor.label}
-              clickable
-              size="small"
-              color={floor.id === selectedFloorId ? "primary" : "default"}
-              variant={floor.id === selectedFloorId ? "filled" : "outlined"}
-              onClick={() => setSelectedFloorId(floor.id)}
-              sx={{
-                fontFamily: "'Manrope', sans-serif",
-                fontWeight: 600,
-              }}
-            />
-          ))}
+      {hasMultiFloorRoute ? (
+        <Stack spacing={1}>
+          <Typography
+            variant="body2"
+            sx={{
+              fontFamily: "'Manrope', sans-serif",
+              fontSize: "13px",
+              lineHeight: 1.45,
+              color: M.labelColor,
+            }}
+          >
+            Переключайте этажи — на карте показан маршрут только для выбранного участка.
+          </Typography>
+          <FloorChipSlider
+            dark
+            items={routeSegments.map((segment, index) => ({
+              key: String(index),
+              label: segment.label,
+            }))}
+            selectedKey={String(routeSegmentIndex)}
+            onSelect={(key) => onSelectRouteSegment(Number(key))}
+          />
         </Stack>
+      ) : floors.length > 0 ? (
+        <FloorChipSlider
+          dark
+          items={floors.map((floor) => ({
+            key: floor.id,
+            label: `Этаж ${floor.label}`,
+          }))}
+          selectedKey={selectedFloorId}
+          onSelect={(key) => handleSelectFloor(key)}
+        />
       ) : null}
 
       {/* Route section */}
@@ -309,8 +340,11 @@ function MobileMapView({
         }}
       >
         <MapRoutePlanner
-          graph={mapGraph}
-          onRouteChange={setLocalRoutePoints}
+          mapGraphs={mapGraphs}
+          floorConnections={floorConnections}
+          onSingleFloorRouteChange={setLocalRoutePoints}
+          onMultiFloorRouteChange={setMultiFloorRoute}
+          onRouteFloorChange={handleRouteFloorChange}
           dark
         />
       </Box>
@@ -329,15 +363,22 @@ function MobileMapView({
       ) : null}
 
       {selectedPlace?.type === "classroom" ? (
-        <RoomSchedulePanel
-          selectedPlace={selectedPlace}
-          scheduleDate={scheduleDate}
-          setScheduleDate={setScheduleDate}
-          roomSchedule={roomSchedule}
-          isLoadingRoomSchedule={isLoadingRoomSchedule}
-          roomScheduleError={roomScheduleError}
-          dark
-        />
+        <Box sx={{ position: "relative", pb: 5 }}>
+          <RoomSchedulePanel
+            selectedPlace={selectedPlace}
+            scheduleDate={scheduleDate}
+            setScheduleDate={setScheduleDate}
+            roomSchedule={roomSchedule}
+            isLoadingRoomSchedule={isLoadingRoomSchedule}
+            roomScheduleError={roomScheduleError}
+            dark
+          />
+          <BookingNavigateButton
+            placeId={selectedPlace.id}
+            scheduleDate={scheduleDate}
+            dark
+          />
+        </Box>
       ) : null}
     </Box>
   );
@@ -379,6 +420,18 @@ function MapPageView({
   selectedMapId,
   setSelectedMapId,
   mapGraph,
+  mapGraphs,
+  floorConnections,
+  multiFloorRoute,
+  setMultiFloorRoute,
+  hasMultiFloorRoute,
+  routeSegments,
+  routeSegmentIndex,
+  onSelectRouteSegment,
+  handleSelectMap,
+  handleSelectFloor,
+  handleRouteFloorChange,
+  displayRoutePoints,
   selectedVectorId,
   targetVectorId,
   targetPlaceId,
@@ -420,7 +473,7 @@ function MapPageView({
         targetPlaceId={targetPlaceId}
         setSelectedVectorId={setSelectedVectorId}
         showLabels={showLabels}
-        localRoutePoints={localRoutePoints}
+        displayRoutePoints={displayRoutePoints}
         mapWidth={mapWidth}
         mapHeight={mapHeight}
         routePoints={routePoints}
@@ -430,6 +483,18 @@ function MapPageView({
         selectedPlaceId={selectedPlaceId}
         setSelectedPlaceId={setSelectedPlaceId}
         mapGraph={mapGraph}
+        mapGraphs={mapGraphs}
+        floorConnections={floorConnections}
+        multiFloorRoute={multiFloorRoute}
+        setMultiFloorRoute={setMultiFloorRoute}
+        hasMultiFloorRoute={hasMultiFloorRoute}
+        routeSegments={routeSegments}
+        routeSegmentIndex={routeSegmentIndex}
+        onSelectRouteSegment={onSelectRouteSegment}
+        handleSelectMap={handleSelectMap}
+        handleSelectFloor={handleSelectFloor}
+        handleRouteFloorChange={handleRouteFloorChange}
+        mapVectors={mapVectors}
         setLocalRoutePoints={setLocalRoutePoints}
         selectedPlace={selectedPlace}
         scheduleDate={scheduleDate}
@@ -466,7 +531,7 @@ function MapPageView({
                         clickable
                         color={vector.id === selectedMapId ? "primary" : "default"}
                         variant={vector.id === selectedMapId ? "filled" : "outlined"}
-                        onClick={() => setSelectedMapId(vector.id)}
+                        onClick={() => handleSelectMap(vector.id)}
                       />
                     ))}
                   </Stack>
@@ -474,12 +539,15 @@ function MapPageView({
               ) : null}
 
 
-              {mapGraph ? (
+              {mapGraphs.length > 0 ? (
                 <>
                   <Divider />
                   <MapRoutePlanner
-                    graph={mapGraph}
-                    onRouteChange={setLocalRoutePoints}
+                    mapGraphs={mapGraphs}
+                    floorConnections={floorConnections}
+                    onSingleFloorRouteChange={setLocalRoutePoints}
+                    onMultiFloorRouteChange={setMultiFloorRoute}
+                    onRouteFloorChange={handleRouteFloorChange}
                   />
                   <Divider />
                 </>
@@ -501,12 +569,12 @@ function MapPageView({
 
 
               {!isLoading && !error && selectedFloor && places.length === 0 ? (
-                <Alert severity="warning">Для выбранного этажа бэкенд не вернул точек.</Alert>
+                <Alert severity="warning">Расписание для этого этажа пока не подгружается.</Alert>
               ) : null}
 
               {selectedPlace ? (
-                <Card variant="outlined">
-                  <CardContent sx={{ p: 2 }}>
+                <Card variant="outlined" sx={{ position: "relative" }}>
+                  <CardContent sx={{ p: 2, pb: selectedPlace.type === "classroom" ? 6.5 : 2 }}>
                     <Typography variant="subtitle1" gutterBottom>
                       {selectedPlace.name}
                     </Typography>
@@ -533,6 +601,12 @@ function MapPageView({
                       />
                     ) : null}
                   </CardContent>
+                  {selectedPlace.type === "classroom" ? (
+                    <BookingNavigateButton
+                      placeId={selectedPlace.id}
+                      scheduleDate={scheduleDate}
+                    />
+                  ) : null}
                 </Card>
               ) : null}
             </Stack>
@@ -547,6 +621,13 @@ function MapPageView({
               Схема этажа
             </Typography>
 
+            {hasMultiFloorRoute ? (
+              <MapMultiFloorRouteView
+                segments={routeSegments}
+                mapVectors={mapVectors}
+                showLabels={showLabels}
+              />
+            ) : (
             <Box
               sx={{
                 position: "relative",
@@ -570,7 +651,7 @@ function MapPageView({
                     targetId={targetVectorId}
                     onSelect={setSelectedVectorId}
                     showLabels={showLabels}
-                    routePoints={localRoutePoints}
+                    routePoints={displayRoutePoints}
                   />
                   {showLabels && selectedVectorId ? (
                     <Box
@@ -783,10 +864,38 @@ function MapPageView({
                 </Box>
               ) : null}
             </Box>
+            )}
           </CardContent>
         </Card>
       </Grid>
     </Grid>
+  );
+}
+
+function BookingNavigateButton({ placeId, scheduleDate, dark = false }) {
+  const navigate = useNavigate();
+
+  return (
+    <Button
+      size="small"
+      variant="contained"
+      onClick={() => navigate(buildBookingUrl({ roomId: placeId, date: scheduleDate }))}
+      sx={{
+        position: "absolute",
+        right: 12,
+        bottom: 12,
+        textTransform: "none",
+        fontWeight: 600,
+        ...(dark
+          ? {
+              bgcolor: "#2F5FA8",
+              "&:hover": { bgcolor: "#3A6FBE" },
+            }
+          : {}),
+      }}
+    >
+      Забронировать
+    </Button>
   );
 }
 

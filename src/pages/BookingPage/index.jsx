@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   addBookingDuration,
   cancelBooking,
@@ -35,6 +36,7 @@ function getTodayDate() {
 }
 
 function BookingPage() {
+  const [searchParams] = useSearchParams();
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
@@ -63,6 +65,17 @@ function BookingPage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const roomId = searchParams.get("roomId")?.trim();
+    const date = searchParams.get("date")?.trim();
+    if (roomId) {
+      setSelectedRoomId(roomId);
+    }
+    if (date) {
+      setSelectedDate(date);
+    }
+  }, [searchParams]);
 
   const handleSetBookedBy = useCallback((v) => {
     const next = filterFioInput(v);
