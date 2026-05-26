@@ -6,6 +6,7 @@ import {
   getMapImage,
   getMapVectors,
   getMapGraphs,
+  getFloorLinks,
   getPlaces,
   getRoomSchedule,
 } from "../../entities/map/mapLib";
@@ -51,6 +52,13 @@ function getMapBaseName(fileName = "") {
   return String(fileName)
     .replace(/\.map\.json$/i, "")
     .replace(/\.graph\.json$/i, "");
+}
+
+function getMapIdForFloor(mapVectors, floor) {
+  const floorNumber = Number(floor);
+  const targetBase = `floor_${floorNumber}`;
+  const matched = mapVectors.find((item) => getMapBaseName(item.id) === targetBase);
+  return matched?.id ?? "";
 }
 
 function getTodayDate() {
@@ -169,6 +177,9 @@ function MapPage() {
   const [targetPlaceId, setTargetPlaceId] = useState("");
   const [showLabels, setShowLabels] = useState(true);
   const [localRoutePoints, setLocalRoutePoints] = useState([]);
+  const [multiFloorRoute, setMultiFloorRoute] = useState(null);
+  const [routeSegmentIndex, setRouteSegmentIndex] = useState(0);
+  const [floorConnections, setFloorConnections] = useState([]);
   const [routeError, setRouteError] = useState("");
   const [scheduleDate, setScheduleDate] = useState(getTodayDate());
   const [roomSchedule, setRoomSchedule] = useState(null);
@@ -191,10 +202,11 @@ function MapPage() {
       setMapWarning("");
 
       try {
-        const [image, vectors, graphs] = await Promise.all([
+        const [image, vectors, graphs, connections] = await Promise.all([
           getMapImage(),
           getMapVectors(),
           getMapGraphs(),
+          getFloorLinks(),
         ]);
 
         if (!isMounted) {
@@ -204,6 +216,7 @@ function MapPage() {
         setMapImage(image);
         setMapVectors(vectors);
         setMapGraphs(graphs);
+        setFloorConnections(connections);
 
         const fallbackId = vectors[0]?.id || graphs[0]?.id || "";
         const initialMapId = fallbackId;
@@ -215,6 +228,7 @@ function MapPage() {
         setMapVector(nextVector);
         setMapGraph(nextGraph);
         setLocalRoutePoints([]);
+        setMultiFloorRoute(null);
 
         if (!image && !nextVector) {
           setMapWarning("В `src/entities/map/assets` не найден файл схемы. Добавьте туда PNG/JPG/SVG или *.map.json.");
@@ -232,6 +246,7 @@ function MapPage() {
         setMapGraph(null);
         setMapWarning(loadError.message || "Не удалось загрузить схему.");
         setLocalRoutePoints([]);
+        setMultiFloorRoute(null);
       } finally {
         if (isMounted) {
           setIsLoadingMap(false);
@@ -285,8 +300,25 @@ function MapPage() {
     setMapVector(nextVector);
     setMapGraph(nextGraph);
     setSelectedVectorId("");
-    setLocalRoutePoints([]);
   }, [selectedMapId, mapVectors, mapGraphs]);
+
+  useEffect(() => {
+    if (!selectedMapId || floors.length === 0) {
+      return;
+    }
+
+    const baseName = getMapBaseName(selectedMapId);
+    const floorMatch = baseName.match(/floor[_-]?(\d+)/i);
+    if (!floorMatch) {
+      return;
+    }
+
+    const floorNum = Number(floorMatch[1]);
+    const matchedFloor = floors.find((f) => f.floor === floorNum);
+    if (matchedFloor && matchedFloor.id !== selectedFloorId) {
+      setSelectedFloorId(matchedFloor.id);
+    }
+  }, [selectedMapId, floors]);
 
   useEffect(() => {
     if (!assistantMapId || mapVectors.length === 0) {
@@ -387,6 +419,41 @@ function MapPage() {
       setTargetVectorId(elementExists ? vectorId : "");
     }
   }, [selectedPlaceId, places, mapVector, targetPlaceId]);
+
+  useEffect(() => {
+    if (!selectedVectorId || places.length === 0) {
+      return;
+    }
+
+    const cyrillicToLatin = {
+      "\u0430": "a",
+      "\u0431": "b",
+      "\u0432": "v",
+      "\u0433": "g",
+      "\u0434": "d",
+      "\u0435": "e",
+    };
+
+    const rawToken = selectedVectorId.replace(/^room-/i, "").toLowerCase();
+    if (!rawToken) {
+      return;
+    }
+
+    const matched = places.find((place) => {
+      const match = place.name.match(/(\d+[\u0430-\u044f\u0451a-z]*)$/i);
+      if (!match) {
+        return false;
+      }
+      const placeCode = match[1]
+        .toLowerCase()
+        .replace(/[\u0430-\u044f\u0451]/g, (ch) => cyrillicToLatin[ch] ?? ch);
+      return placeCode === rawToken;
+    });
+
+    if (matched && matched.id !== selectedPlaceId) {
+      setSelectedPlaceId(matched.id);
+    }
+  }, [selectedVectorId, places]);
 
   useEffect(() => {
     if (!selectedFloorId) {
@@ -495,6 +562,11 @@ function MapPage() {
   const mapPois = Array.isArray(mapVector?.pois) ? mapVector.pois : [];
   const hasMapAsset = Boolean(mapImage || mapVector);
   const is3D = Boolean(mapVector);
+  const hasMultiFloorRoute = (multiFloorRoute?.segments?.length ?? 0) > 0;
+  const routeSegments = multiFloorRoute?.segments ?? [];
+  const displayRoutePoints = hasMultiFloorRoute
+    ? routeSegments[routeSegmentIndex]?.points ?? []
+    : localRoutePoints;
   const isRouteDisabled = !routeFromPlaceId || !routeToPlaceId || routeFromPlaceId === routeToPlaceId || isBuildingRoute;
   const routePoints = (route?.steps ?? []).filter((step) => {
     if (!selectedFloor) {
@@ -509,6 +581,73 @@ function MapPage() {
       return `${point.x},${point.y}`;
     })
     .join(" ");
+
+  function handleSelectFloor(floorId) {
+    setSelectedFloorId(floorId);
+    const selectedFloor = floors.find((floor) => floor.id === floorId);
+    if (!selectedFloor) {
+      return;
+    }
+    handleSelectMap(getMapIdForFloor(mapVectors, selectedFloor.floor));
+  }
+
+  function handleSelectMap(mapId) {
+    if (!mapId) {
+      return;
+    }
+    setSelectedMapId(mapId);
+    setMultiFloorRoute(null);
+    setRouteSegmentIndex(0);
+    setLocalRoutePoints([]);
+
+    const floorMatch = getMapBaseName(mapId).match(/floor[_-]?(\d+)/i);
+    if (!floorMatch) {
+      return;
+    }
+    const floorNum = Number(floorMatch[1]);
+    const matchedFloor = floors.find((floor) => floor.floor === floorNum);
+    if (matchedFloor) {
+      setSelectedFloorId(matchedFloor.id);
+    }
+  }
+
+  function handleRouteFloorChange(floor) {
+    handleSelectMap(getMapIdForFloor(mapVectors, floor));
+  }
+
+  function handleSelectRouteSegment(index) {
+    if (!multiFloorRoute?.segments?.length) {
+      return;
+    }
+    const segment = multiFloorRoute.segments[index];
+    if (!segment) {
+      return;
+    }
+    setRouteSegmentIndex(index);
+    const mapId = getMapIdForFloor(mapVectors, segment.floor);
+    if (mapId) {
+      setSelectedMapId(mapId);
+      const matchedFloor = floors.find((floor) => floor.floor === segment.floor);
+      if (matchedFloor) {
+        setSelectedFloorId(matchedFloor.id);
+      }
+    }
+    setLocalRoutePoints(segment.points ?? []);
+  }
+
+  useEffect(() => {
+    if (!multiFloorRoute?.segments?.length) {
+      setRouteSegmentIndex(0);
+      return;
+    }
+    setRouteSegmentIndex(0);
+    const firstSegment = multiFloorRoute.segments[0];
+    const mapId = getMapIdForFloor(mapVectors, firstSegment.floor);
+    if (mapId) {
+      setSelectedMapId(mapId);
+    }
+    setLocalRoutePoints(firstSegment.points ?? []);
+  }, [multiFloorRoute, mapVectors]);
 
   async function handleBuildRoute() {
     if (isRouteDisabled) {
@@ -576,6 +715,18 @@ function MapPage() {
       selectedMapId={selectedMapId}
       setSelectedMapId={setSelectedMapId}
       mapGraph={mapGraph}
+      mapGraphs={mapGraphs}
+      floorConnections={floorConnections}
+      multiFloorRoute={multiFloorRoute}
+      setMultiFloorRoute={setMultiFloorRoute}
+      hasMultiFloorRoute={hasMultiFloorRoute}
+      routeSegments={routeSegments}
+      routeSegmentIndex={routeSegmentIndex}
+      onSelectRouteSegment={handleSelectRouteSegment}
+      handleSelectMap={handleSelectMap}
+      handleSelectFloor={handleSelectFloor}
+      handleRouteFloorChange={handleRouteFloorChange}
+      displayRoutePoints={displayRoutePoints}
       selectedVectorId={selectedVectorId}
       setSelectedVectorId={setSelectedVectorId}
       targetVectorId={targetVectorId}

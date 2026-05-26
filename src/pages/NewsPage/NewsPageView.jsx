@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
@@ -5,9 +6,69 @@ import CardMedia from "@mui/material/CardMedia";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
+import IconButton from "@mui/material/IconButton";
+import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
+
+function LinkIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.41 1.41"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.41-1.41"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function CopyLinkButton({ pageUrl, onCopy, sx }) {
+  if (!pageUrl) {
+    return null;
+  }
+
+  return (
+    <Tooltip title="Скопировать ссылку">
+      <IconButton
+        size="small"
+        aria-label="Скопировать ссылку"
+        onClick={() => onCopy(pageUrl)}
+        sx={sx}
+      >
+        <LinkIcon />
+      </IconButton>
+    </Tooltip>
+  );
+}
 
 const M = {
   sectionBg: "linear-gradient(180deg, rgba(24, 40, 66, 0.58) 0%, rgba(18, 31, 53, 0.95) 100%), #121F35",
@@ -19,8 +80,8 @@ const M = {
   labelColor: "#AFBFDE",
 };
 
-function MobileNewsCard({ item }) {
-  const { title, preview_text, published_at, imagePreview, tags } = item;
+function MobileNewsCard({ item, onCopy }) {
+  const { title, preview_text, published_at, imagePreview, tags, page_url } = item;
   const dateStr = published_at
     ? `${published_at.day} ${published_at.month} ${published_at.year}`
     : null;
@@ -28,12 +89,26 @@ function MobileNewsCard({ item }) {
   return (
     <Box
       sx={{
+        position: "relative",
         background: M.articleBg,
         border: `1px solid ${M.articleBorder}`,
         borderRadius: "12px",
         overflow: "hidden",
       }}
     >
+      <CopyLinkButton
+        pageUrl={page_url}
+        onCopy={onCopy}
+        sx={{
+          position: "absolute",
+          top: 6,
+          right: 6,
+          zIndex: 1,
+          color: M.labelColor,
+          backgroundColor: "rgba(18, 31, 53, 0.72)",
+          "&:hover": { backgroundColor: "rgba(18, 31, 53, 0.9)" },
+        }}
+      />
       {imagePreview ? (
         <Box
           component="img"
@@ -111,7 +186,7 @@ function MobileNewsCard({ item }) {
   );
 }
 
-function MobileNewsView({ items, loading, error }) {
+function MobileNewsView({ items, loading, error, onCopy }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <Box
@@ -167,7 +242,7 @@ function MobileNewsView({ items, loading, error }) {
         ) : (
           <Stack spacing="9px">
             {items.map((item) => (
-              <MobileNewsCard key={item.slug} item={item} />
+              <MobileNewsCard key={item.slug} item={item} onCopy={onCopy} />
             ))}
           </Stack>
         )}
@@ -176,23 +251,40 @@ function MobileNewsView({ items, loading, error }) {
   );
 }
 
-function NewsCard({ item }) {
-  const { title, preview_text, published_at, imagePreview, tags } = item;
+function NewsCard({ item, onCopy }) {
+  const { title, preview_text, published_at, imagePreview, tags, page_url } = item;
 
   const dateStr = published_at
     ? `${published_at.day} ${published_at.month} ${published_at.year}`
     : null;
 
-  // TODO: когда будет страница новости — вернуть component="a" href={page_url} target="_blank" rel="noopener noreferrer"
   return (
     <Card
       sx={{
+        position: "relative",
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        cursor: "default",
       }}
     >
+      <CopyLinkButton
+        pageUrl={page_url}
+        onCopy={onCopy}
+        sx={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          zIndex: 2,
+          transition: "background-color 0.2s ease",
+          color: "#fff",
+          backgroundColor: "rgba(15, 23, 42, 0.72)",
+          backdropFilter: "blur(4px)",
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
+          "&:hover": {
+            backgroundColor: "rgba(15, 23, 42, 0.9)",
+          },
+        }}
+      />
       {imagePreview && (
         <CardMedia
           component="img"
@@ -240,12 +332,58 @@ function NewsCard({ item }) {
 
 function NewsPageView({ items, loading, error }) {
   const isMobile = useMediaQuery("(max-width:600px)");
+  const [snackbar, setSnackbar] = useState({ open: false, message: "" });
+
+  const handleCopyLink = useCallback(async (pageUrl) => {
+    if (!pageUrl) {
+      setSnackbar({ open: true, message: "Ссылка недоступна" });
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(pageUrl);
+      setSnackbar({ open: true, message: "Ссылка скопирована" });
+    } catch {
+      setSnackbar({ open: true, message: "Не удалось скопировать ссылку" });
+    }
+  }, []);
+
+  const snackbarNode = (
+    <Snackbar
+      open={snackbar.open}
+      autoHideDuration={2500}
+      onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+      message={snackbar.message}
+      anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      slotProps={{
+        content: {
+          sx: {
+            minWidth: 15,
+            py: 1,
+            boxShadow: 2,
+            fontSize: "16px",
+            "& .MuiSnackbarContent-message": {
+              py: 0.25,
+              fontSize: "16px",
+              lineHeight: 1.2,
+            },
+          },
+        },
+      }}
+    />
+  );
 
   if (isMobile) {
-    return <MobileNewsView items={items} loading={loading} error={error} />;
+    return (
+      <>
+        <MobileNewsView items={items} loading={loading} error={error} onCopy={handleCopyLink} />
+        {snackbarNode}
+      </>
+    );
   }
 
   return (
+    <>
     <Card sx={{ borderRadius: 2 }}>
       <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Typography variant="h4" component="h1" gutterBottom>
@@ -274,13 +412,15 @@ function NewsPageView({ items, loading, error }) {
           <Grid container spacing={2}>
             {items.map((item) => (
               <Grid key={item.slug} size={{ xs: 12, sm: 6, md: 4 }}>
-                <NewsCard item={item} />
+                <NewsCard item={item} onCopy={handleCopyLink} />
               </Grid>
             ))}
           </Grid>
         )}
       </CardContent>
     </Card>
+    {snackbarNode}
+    </>
   );
 }
 

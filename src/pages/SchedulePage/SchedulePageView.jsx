@@ -2,7 +2,6 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Grid from "@mui/material/Grid";
 import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -16,6 +15,7 @@ import CardContent from "@mui/material/CardContent";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import SectionCard from "../../shared/ui/SectionCard";
 import LabeledSelect from "../../shared/ui/LabeledSelect";
+import GroupAutocomplete from "../../shared/ui/GroupAutocomplete";
 import EmptyTableRow from "../../shared/ui/EmptyTableRow";
 
 const M = {
@@ -38,6 +38,7 @@ const M = {
 function MobileScheduleView({
   selectedGroupId,
   setSelectedGroupId,
+  setGroupQuery,
   groups,
   handleShowSchedule,
   loadingSchedule,
@@ -84,32 +85,26 @@ function MobileScheduleView({
             px: "15px",
           }}
         >
-          <Select
-            size="small"
+          <GroupAutocomplete
+            groups={groups}
             value={selectedGroupId}
-            displayEmpty
-            onChange={(e) => setSelectedGroupId(e.target.value)}
+            onChange={setSelectedGroupId}
+            onInputChange={setGroupQuery}
+            placeholder="Начните вводить группу…"
             variant="standard"
-            disableUnderline
-            fullWidth
-            sx={{
-              fontFamily: "'Manrope', sans-serif",
-              fontWeight: 400,
-              fontSize: "14.7px",
-              color: M.inputColor,
-              "& .MuiSelect-icon": { color: M.inputColor },
-              "& .MuiSelect-select": { p: 0 },
+            inputSx={{
+              "& .MuiInputBase-root": {
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 400,
+                fontSize: "14.7px",
+                color: M.inputColor,
+              },
+              "& .MuiInputBase-input": { p: 0 },
             }}
-          >
-            <MenuItem value="">
-              <em style={{ color: M.bodyColor }}>Выберите группу</em>
-            </MenuItem>
-            {groups.map((group) => (
-              <MenuItem key={group.id} value={group.id}>
-                {group.name}
-              </MenuItem>
-            ))}
-          </Select>
+            sx={{
+              "& .MuiAutocomplete-endAdornment": { color: M.inputColor },
+            }}
+          />
         </Box>
         {error ? (
           <Typography
@@ -258,6 +253,7 @@ function MobileScheduleView({
 function SchedulePageView({
   selectedGroupId,
   setSelectedGroupId,
+  setGroupQuery,
   groups,
   handleShowSchedule,
   loadingSchedule,
@@ -278,6 +274,7 @@ function SchedulePageView({
       <MobileScheduleView
         selectedGroupId={selectedGroupId}
         setSelectedGroupId={setSelectedGroupId}
+        setGroupQuery={setGroupQuery}
         groups={groups}
         handleShowSchedule={handleShowSchedule}
         loadingSchedule={loadingSchedule}
@@ -304,21 +301,13 @@ function SchedulePageView({
               description="Выберите группу и загрузите ее расписание."
             >
               <Stack spacing={1.2}>
-                <Select
-                  size="small"
+                <GroupAutocomplete
+                  groups={groups}
                   value={selectedGroupId}
-                  displayEmpty
-                  onChange={(event) => setSelectedGroupId(event.target.value)}
-                >
-                  <MenuItem value="">
-                    <em>Выберите группу</em>
-                  </MenuItem>
-                  {groups.map((group) => (
-                    <MenuItem key={group.id} value={group.id}>
-                      {group.name}
-                    </MenuItem>
-                  ))}
-                </Select>
+                  onChange={setSelectedGroupId}
+                  onInputChange={setGroupQuery}
+                  placeholder="Начните вводить группу…"
+                />
                 <Button
                   variant="contained"
                   onClick={handleShowSchedule}

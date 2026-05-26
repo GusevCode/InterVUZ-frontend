@@ -18,9 +18,41 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 
+import { FIO_MAX_LENGTH, formatRoomNumber } from "../../shared/bookingForm";
 import EmptyTableRow from "../../shared/ui/EmptyTableRow";
 import LabeledSelect from "../../shared/ui/LabeledSelect";
+import RoomAutocomplete, { ALL_ROOMS_ID } from "../../shared/ui/RoomAutocomplete";
 import SectionCard from "../../shared/ui/SectionCard";
+
+const tableCompactCell = {
+  py: 1.25,
+  px: 1.5,
+  fontSize: "0.875rem",
+  lineHeight: 1.45,
+};
+
+const tableColRoom = { ...tableCompactCell, width: 58, pl: 1.25, pr: 2 };
+const tableColDate = { ...tableCompactCell, width: 94, px: 1.75 };
+const tableColTime = { ...tableCompactCell, width: 108, px: 1.75 };
+const tableColWho = { ...tableCompactCell, pl: 1.75, pr: 1.25 };
+const tableColAction = {
+  ...tableCompactCell,
+  width: 100,
+  pl: 1.25,
+  pr: 2,
+};
+
+const roomChipSx = {
+  height: 28,
+  minWidth: 0,
+  maxWidth: 60,
+  "& .MuiChip-label": {
+    px: 0.75,
+    fontSize: "0.8125rem",
+    fontWeight: 600,
+    lineHeight: 1.35,
+  },
+};
 
 const M = {
   sectionBg: "linear-gradient(180deg, rgba(24, 40, 66, 0.58) 0%, rgba(18, 31, 53, 0.95) 100%), #121F35",
@@ -110,13 +142,17 @@ function MobileBookingView({
   purpose,
   setPurpose,
   error,
+  fieldErrors = {},
   success,
   handleBook,
   submitting,
+  bookingDisabled = false,
   filteredBookings,
   loadingBookings,
   roomMap,
 }) {
+  const bookButtonDisabled = submitting || bookingDisabled;
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {/* Search / booking form */}
@@ -263,22 +299,32 @@ function MobileBookingView({
           </Box>
         </Box>
 
-        {/* Capacity / Room */}
-        <MobileSelectInput
-          label="Аудитория"
+        <RoomAutocomplete
+          rooms={rooms}
           value={selectedRoomId}
-          onChange={(e) => setSelectedRoomId(e.target.value)}
-        >
-          <MenuItem value="">
-            <em style={{ color: M.bodyColor }}>Выберите аудиторию</em>
-          </MenuItem>
-          {rooms.map((room) => (
-            <MenuItem key={room.id} value={room.id}>
-              {room.name}
-              {room.capacity ? ` · до ${room.capacity} чел.` : ""}
-            </MenuItem>
-          ))}
-        </MobileSelectInput>
+          onChange={setSelectedRoomId}
+          label="Аудитория"
+          placeholder="Например, 10"
+          sx={{
+            "& .MuiInputLabel-root": {
+              fontFamily: "'Manrope', sans-serif",
+              fontWeight: 700,
+              fontSize: "13.3px",
+              letterSpacing: "0.531px",
+              textTransform: "uppercase",
+              color: M.labelColor,
+            },
+            "& .MuiOutlinedInput-root": {
+              background: M.inputBg,
+              borderRadius: "12px",
+              fontFamily: "'Manrope', sans-serif",
+              color: M.inputColor,
+              "& fieldset": { borderColor: M.inputBorder },
+              "&:hover fieldset": { borderColor: M.inputBorder },
+              "&.Mui-focused fieldset": { borderColor: M.inputBorder },
+            },
+          }}
+        />
 
         <Box sx={{ mt: "17px" }}>
           <Typography
@@ -311,6 +357,7 @@ function MobileBookingView({
               value={bookedBy}
               onChange={(e) => setBookedBy(e.target.value)}
               placeholder="Фамилия И.О."
+              maxLength={FIO_MAX_LENGTH}
               sx={{
                 width: "100%",
                 background: "transparent",
@@ -323,6 +370,18 @@ function MobileBookingView({
               }}
             />
           </Box>
+          {fieldErrors.bookedBy ? (
+            <Typography
+              sx={{
+                fontFamily: "'Manrope', sans-serif",
+                fontSize: "12px",
+                color: "#ff6b6b",
+                mt: "6px",
+              }}
+            >
+              {fieldErrors.bookedBy}
+            </Typography>
+          ) : null}
         </Box>
 
         <Box sx={{ mt: "17px" }}>
@@ -343,7 +402,7 @@ function MobileBookingView({
           <Box
             sx={{
               background: M.inputBg,
-              border: `1px solid ${M.inputBorder}`,
+              border: `1px solid ${fieldErrors.contact ? "#ff6b6b" : M.inputBorder}`,
               borderRadius: "12px",
               height: "46px",
               display: "flex",
@@ -353,9 +412,11 @@ function MobileBookingView({
           >
             <Box
               component="input"
+              type="tel"
+              inputMode="tel"
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
-              placeholder="Телефон, Telegram или email"
+              placeholder="Телефон"
               sx={{
                 width: "100%",
                 background: "transparent",
@@ -368,6 +429,18 @@ function MobileBookingView({
               }}
             />
           </Box>
+          {fieldErrors.contact ? (
+            <Typography
+              sx={{
+                fontFamily: "'Manrope', sans-serif",
+                fontSize: "12px",
+                color: "#ff6b6b",
+                mt: "6px",
+              }}
+            >
+              {fieldErrors.contact}
+            </Typography>
+          ) : null}
         </Box>
 
         {error ? (
@@ -399,15 +472,15 @@ function MobileBookingView({
         <Box
           component="button"
           onClick={handleBook}
-          disabled={submitting}
+          disabled={bookButtonDisabled}
           sx={{
             width: "100%",
             height: "40px",
             mt: "18px",
-            background: submitting ? "rgba(42, 109, 240, 0.5)" : M.primaryBtnBg,
+            background: bookButtonDisabled ? "rgba(42, 109, 240, 0.5)" : M.primaryBtnBg,
             border: `1px solid ${M.primaryBtnBorder}`,
             borderRadius: "12px",
-            cursor: submitting ? "not-allowed" : "pointer",
+            cursor: bookButtonDisabled ? "not-allowed" : "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -499,7 +572,10 @@ function MobileBookingView({
                       color: M.bodyColor,
                     }}
                   >
-                    {roomMap[b.room_id]?.name ?? b.room_id}
+                    {formatRoomNumber(
+                      roomMap[b.room_id]?.name,
+                      b.room_id
+                    )}
                   </Typography>
                   <Typography
                     sx={{
@@ -587,15 +663,25 @@ function BookingPageView({
   purpose,
   setPurpose,
   error,
+  fieldErrors = {},
   success,
   handleBook,
   submitting,
+  bookingDisabled = false,
   handleCancel,
   filteredBookings,
   loadingBookings,
   roomMap,
 }) {
   const isMobile = useMediaQuery("(max-width:600px)");
+  const bookButtonDisabled = submitting || bookingDisabled;
+
+  const roomFilterLabel =
+    selectedRoomId === ALL_ROOMS_ID
+      ? "все аудитории"
+      : selectedRoomId
+        ? roomMap[selectedRoomId]?.name
+        : "все аудитории";
 
   if (isMobile) {
     return (
@@ -615,9 +701,11 @@ function BookingPageView({
         purpose={purpose}
         setPurpose={setPurpose}
         error={error}
+        fieldErrors={fieldErrors}
         success={success}
         handleBook={handleBook}
         submitting={submitting}
+        bookingDisabled={bookingDisabled}
         filteredBookings={filteredBookings}
         loadingBookings={loadingBookings}
         roomMap={roomMap}
@@ -644,28 +732,11 @@ function BookingPageView({
                   Бронь создаётся на фиксированные 1,5 часа.
                 </Alert>
 
-                <LabeledSelect
-                  label="Аудитория"
+                <RoomAutocomplete
+                  rooms={rooms}
                   value={selectedRoomId}
-                  onChange={(e) => setSelectedRoomId(e.target.value)}
-                >
-                  <MenuItem value="">
-                    <em>Выберите аудиторию</em>
-                  </MenuItem>
-                  {rooms.map((room) => (
-                    <MenuItem key={room.id} value={room.id}>
-                      {room.name}
-                      <Typography
-                        component="span"
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ ml: 1 }}
-                      >
-                        (до {room.capacity} чел.)
-                      </Typography>
-                    </MenuItem>
-                  ))}
-                </LabeledSelect>
+                  onChange={setSelectedRoomId}
+                />
 
                 <TextField
                   type="date"
@@ -707,19 +778,30 @@ function BookingPageView({
                 <TextField
                   size="small"
                   fullWidth
-                  label="Ваше имя"
+                  label="Ваши данные"
                   value={bookedBy}
                   onChange={(e) => setBookedBy(e.target.value)}
                   placeholder="Фамилия И.О."
+                  error={Boolean(fieldErrors.bookedBy)}
+                  helperText={fieldErrors.bookedBy}
+                  slotProps={{
+                    htmlInput: { maxLength: FIO_MAX_LENGTH },
+                  }}
                 />
 
                 <TextField
                   size="small"
                   fullWidth
                   label="Контакт"
+                  type="tel"
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value)}
-                  placeholder="Телефон, Telegram или email"
+                  placeholder="+7 (999) 123-45-67"
+                  error={Boolean(fieldErrors.contact)}
+                  helperText={fieldErrors.contact}
+                  slotProps={{
+                    htmlInput: { inputMode: "tel" },
+                  }}
                 />
 
                 {error ? (
@@ -738,7 +820,7 @@ function BookingPageView({
                   variant="contained"
                   onClick={handleBook}
                   size="large"
-                  disabled={submitting}
+                  disabled={bookButtonDisabled}
                 >
                   {submitting ? "Бронирование…" : "Забронировать"}
                 </Button>
@@ -752,19 +834,22 @@ function BookingPageView({
               title="Существующие бронирования"
               description={
                 selectedRoomId || selectedDate
-                  ? `Фильтр: ${selectedRoomId ? roomMap[selectedRoomId]?.name : "все аудитории"} · ${selectedDate ? formatDate(selectedDate) : "все даты"}`
-                  : "Все бронирования. Выберите аудиторию или дату для фильтрации."
+                  ? `Фильтр: ${roomFilterLabel} · ${selectedDate ? formatDate(selectedDate) : "все даты"}`
+                  : "Все бронирования, выберите аудиторию или дату для фильтрации"
               }
             >
-              <TableContainer>
-                <Table size="small">
+              <TableContainer sx={{ overflowX: "hidden", pr: 1 }}>
+                <Table
+                  size="small"
+                  sx={{ tableLayout: "fixed", width: "100%" }}
+                >
                   <TableHead>
                     <TableRow>
-                      <TableCell>Аудитория</TableCell>
-                      <TableCell>Дата</TableCell>
-                      <TableCell>Время</TableCell>
-                      <TableCell>Кем / Цель</TableCell>
-                      <TableCell />
+                      <TableCell sx={tableColRoom}>№</TableCell>
+                      <TableCell sx={tableColDate}>Дата</TableCell>
+                      <TableCell sx={tableColTime}>Время</TableCell>
+                      <TableCell sx={tableColWho}>Кем</TableCell>
+                      <TableCell sx={tableColAction} align="right" />
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -778,37 +863,61 @@ function BookingPageView({
                     ) : (
                       filteredBookings.map((b) => (
                         <TableRow key={b.id} hover>
-                          <TableCell sx={{ whiteSpace: "nowrap" }}>
+                          <TableCell sx={tableColRoom}>
                             <Chip
-                              label={roomMap[b.room_id]?.name ?? b.room_id}
+                              label={formatRoomNumber(
+                                roomMap[b.room_id]?.name,
+                                b.room_id
+                              )}
                               size="small"
                               variant="outlined"
+                              sx={roomChipSx}
                             />
                           </TableCell>
-                          <TableCell sx={{ whiteSpace: "nowrap" }}>
+                          <TableCell sx={tableColDate}>
                             {formatDate(b.date)}
                           </TableCell>
-                          <TableCell sx={{ whiteSpace: "nowrap" }}>
+                          <TableCell sx={tableColTime}>
                             {b.time_start}–{b.time_end}
                           </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={500}>
+                          <TableCell
+                            sx={{
+                              ...tableColWho,
+                              overflow: "hidden",
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              fontWeight={600}
+                              noWrap
+                              display="block"
+                              title={b.booked_by}
+                            >
                               {b.booked_by}
                             </Typography>
                             <Typography
-                              variant="caption"
+                              variant="body2"
                               color="text.secondary"
+                              noWrap
+                              display="block"
+                              title={b.purpose}
                             >
                               {b.purpose}
                             </Typography>
                           </TableCell>
-                          <TableCell align="right">
+                          <TableCell align="right" sx={tableColAction}>
                             <Button
                               size="small"
                               color="error"
                               variant="outlined"
                               onClick={() => handleCancel(b.id)}
-                              sx={{ whiteSpace: "nowrap", minWidth: 0, px: 1 }}
+                              sx={{
+                                minWidth: 0,
+                                px: 1.25,
+                                py: 0.5,
+                                fontSize: "0.8125rem",
+                                lineHeight: 1.35,
+                              }}
                             >
                               Отменить
                             </Button>

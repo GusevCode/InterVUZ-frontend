@@ -1,4 +1,5 @@
 import { fetchJson, postJson } from "../../shared/baseApi";
+import { getFloorFromMapId } from "./routeGraphLib";
 
 const localMapModules = import.meta.glob("./assets/*.{png,jpg,jpeg,webp,avif,gif,svg}", {
   eager: true,
@@ -9,6 +10,10 @@ const localMapVectorModules = import.meta.glob("./assets/*.map.json", {
   import: "default",
 });
 const localMapGraphModules = import.meta.glob("./assets/*.graph.json", {
+  eager: true,
+  import: "default",
+});
+const localFloorLinksModule = import.meta.glob("./assets/floor-links.json", {
   eager: true,
   import: "default",
 });
@@ -218,31 +223,40 @@ async function getAllPlaces() {
   return cachedPlacesPromise;
 }
 
+function registerFloor(floorsMap, building, floor, placesDelta = 0) {
+  if (building === undefined || floor === undefined || building === "") {
+    return;
+  }
+
+  const key = `${building}:${floor}`;
+
+  if (!floorsMap.has(key)) {
+    floorsMap.set(key, {
+      id: key,
+      label: String(floor),
+      building,
+      floor,
+      placesTotal: 0,
+    });
+  }
+
+  floorsMap.get(key).placesTotal += placesDelta;
+}
+
 export async function getAvailableFloors() {
-  const places = await getAllPlaces();
+  const [places, vectors] = await Promise.all([getAllPlaces(), getMapVectors()]);
   const floorsMap = new Map();
 
   places.forEach((place) => {
-    const building = place.coordinates?.building;
-    const floor = place.coordinates?.floor;
+    registerFloor(floorsMap, place.coordinates?.building, place.coordinates?.floor, 1);
+  });
 
-    if (building === undefined || floor === undefined || building === "") {
+  vectors.forEach((vector) => {
+    const floorNumber = getFloorFromMapId(vector.id);
+    if (floorNumber === null) {
       return;
     }
-
-    const key = `${building}:${floor}`;
-
-    if (!floorsMap.has(key)) {
-      floorsMap.set(key, {
-        id: key,
-        label: String(floor),
-        building,
-        floor,
-        placesTotal: 0,
-      });
-    }
-
-    floorsMap.get(key).placesTotal += 1;
+    registerFloor(floorsMap, normalizeBuilding("1"), floorNumber, 0);
   });
 
   return Array.from(floorsMap.values()).sort(compareFloors);
@@ -278,6 +292,12 @@ export async function getMapGraphs() {
   }
 
   return cachedMapGraphsPromise;
+}
+
+export async function getFloorLinks() {
+  const entries = Object.values(localFloorLinksModule);
+  const data = entries[0];
+  return Array.isArray(data?.connections) ? data.connections : [];
 }
 
 export async function getPlaces(filters = {}) {
