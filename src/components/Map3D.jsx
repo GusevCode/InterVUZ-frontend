@@ -18,9 +18,13 @@ const MAP_PALETTE = {
 };
 
 const POI_COLORS = {
+  room: "#0ea5e9",
+  stairs: "#7c3aed",
   printer: "#f59e0b",
+  food: "#22c55e",
   cafe: "#22c55e",
   cafeteria: "#22c55e",
+  toilet: "#3b82f6",
   wc: "#3b82f6",
   restroom: "#3b82f6",
   info: "#a855f7",
@@ -333,13 +337,12 @@ export default function Map3D({
   const poiMarkers = useMemo(() => (
     sourcePois.map((poi) => ({
       ...poi,
-      baseZ: baseDepth + 0.8,
-      radius: 2.2,
-      height: Math.max(20, roomDepth * 0.55),
+      radius: 4.5,
+      z: baseDepth + 4.5,
       color: getPoiColor(poi.type),
       label: poi.title || poi.id,
     }))
-  ), [sourcePois, baseDepth, roomDepth]);
+  ), [sourcePois, baseDepth]);
 
   const meshes = useMemo(
     () => [
@@ -441,7 +444,7 @@ export default function Map3D({
       label: poi.label,
       x: poi.x,
       y: poi.y,
-      z: poi.baseZ + poi.height + poi.radius + 1.8,
+      z: poi.z + poi.radius + 1.8,
     }))
   ), [poiMarkers]);
 
@@ -494,7 +497,7 @@ export default function Map3D({
       return {
         x: poi.x,
         y: poi.y,
-        z: poi.baseZ + poi.height + poi.radius * 0.8,
+        z: poi.z + poi.radius * 0.8,
         markerRadius: Math.max(2.6, poi.radius * 1.15),
       };
     }
@@ -620,11 +623,15 @@ export default function Map3D({
           const isSelected = poi.id === selectedId;
           const isHovered = poi.id === hoveredId;
           const color = isSelected ? MAP_PALETTE.selected : isHovered ? MAP_PALETTE.hover : poi.color;
+          const scale = isHovered ? 1.2 : 1;
 
           return (
-            <group
+            <mesh
               key={`poi-${poi.id}`}
-              position={[poi.x, poi.y, poi.baseZ]}
+              position={[poi.x, poi.y, poi.z]}
+              scale={[scale, scale, scale]}
+              castShadow
+              receiveShadow
               onPointerDown={(event) => {
                 event.stopPropagation();
                 handleSelect(poi.id);
@@ -635,28 +642,15 @@ export default function Map3D({
               }}
               onPointerOut={() => setHoveredId(null)}
             >
-              <mesh castShadow receiveShadow position={[0, 0, poi.height * 0.5]}>
-                <cylinderGeometry args={[poi.radius, poi.radius, poi.height, 24]} />
-                <meshStandardMaterial
-                  color={color}
-                  emissive={color}
-                  emissiveIntensity={isSelected || isHovered ? 0.4 : 0.14}
-                  metalness={0.12}
-                  roughness={0.42}
-                />
-              </mesh>
-              <mesh position={[0, 0, poi.height + 0.25]}>
-                <circleGeometry args={[poi.radius * 0.7, 20]} />
-                <meshStandardMaterial
-                  color="#fff7ed"
-                  emissive={color}
-                  emissiveIntensity={isSelected || isHovered ? 0.9 : 0.45}
-                  metalness={0.04}
-                  roughness={0.35}
-                  side={THREE.DoubleSide}
-                />
-              </mesh>
-            </group>
+              <sphereGeometry args={[poi.radius, 24, 24]} />
+              <meshStandardMaterial
+                color={color}
+                emissive={color}
+                emissiveIntensity={isSelected || isHovered ? 0.55 : 0.25}
+                metalness={0.15}
+                roughness={0.35}
+              />
+            </mesh>
           );
         })}
         {routeGeometry ? (

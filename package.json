@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "map:convert": "node scripts/convert-svg-to-json.mjs",
     "map:refine": "node scripts/refine-illustrator-map.mjs",
-    "map:bmstu-1": "node scripts/build-bmstu-floor-map.mjs"
+    "map:bmstu-1": "node scripts/build-bmstu-floor-map.mjs",
+    "map:floor-2": "node scripts/build-floor-2-guk-map.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

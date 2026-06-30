@@ -131,6 +131,18 @@ export default function MapRoutePlanner({
     setToNodeId(nextTo);
   }, [toFloor, toFloorData?.graphId, fromNodeId, toSelectableNodes]);
 
+  // Clicking a room marker on the map selects it as the "Откуда" point,
+  // so its label is substituted into the route's source autocomplete input.
+  useEffect(() => {
+    if (!selectedRouteNodeId) {
+      return;
+    }
+    setFromNodeId(selectedRouteNodeId);
+    if (Number.isFinite(Number(activeFloor))) {
+      setFromFloor(Number(activeFloor));
+    }
+  }, [selectedRouteNodeId, activeFloor]);
+
   function handleBuildRoute() {
     setError("");
 
@@ -249,21 +261,8 @@ export default function MapRoutePlanner({
       {selectedRouteNodeId ? (
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography variant="caption" color="text.secondary" sx={dark ? { color: D.labelColor } : {}}>
-            Выбрана аудитория на карте
+            Аудитория с карты подставлена в «Откуда»
           </Typography>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => {
-              setFromNodeId(selectedRouteNodeId);
-              if (Number.isFinite(Number(activeFloor))) {
-                setFromFloor(Number(activeFloor));
-              }
-            }}
-            sx={dark ? { color: D.btnText, borderColor: D.btnBorder } : {}}
-          >
-            Откуда
-          </Button>
           <Button
             size="small"
             variant="outlined"
@@ -275,7 +274,7 @@ export default function MapRoutePlanner({
             }}
             sx={dark ? { color: D.btnText, borderColor: D.btnBorder } : {}}
           >
-            Куда
+            Сделать «Куда»
           </Button>
         </Stack>
       ) : null}
