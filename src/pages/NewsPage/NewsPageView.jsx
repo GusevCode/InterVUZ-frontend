@@ -80,6 +80,45 @@ const M = {
   labelColor: "#AFBFDE",
 };
 
+// Curated tag palette tuned for the dark Manrope theme — tinted chips instead of
+// arbitrary backend colors, which often clash with the navy cards (e.g. plain grey).
+const TAG_PALETTE = [
+  { bg: "rgba(42, 109, 240, 0.16)", border: "rgba(95, 142, 229, 0.45)", text: "#9DC3FF" },
+  { bg: "rgba(58, 199, 168, 0.16)", border: "rgba(58, 199, 168, 0.45)", text: "#7FE8C9" },
+  { bg: "rgba(242, 184, 75, 0.16)", border: "rgba(242, 184, 75, 0.45)", text: "#F7CD86" },
+  { bg: "rgba(228, 91, 143, 0.16)", border: "rgba(228, 91, 143, 0.45)", text: "#FFA9C6" },
+  { bg: "rgba(139, 124, 246, 0.16)", border: "rgba(139, 124, 246, 0.45)", text: "#C2B8FF" },
+  { bg: "rgba(77, 210, 242, 0.16)", border: "rgba(77, 210, 242, 0.45)", text: "#9CE5FA" },
+];
+
+// Same idea, but tuned for light desktop cards — solid-ish tints with darker,
+// readable text instead of the backend's raw (often plain grey) tag.color.
+const TAG_PALETTE_LIGHT = [
+  { bg: "rgba(42, 109, 240, 0.12)", border: "rgba(42, 109, 240, 0.32)", text: "#1D4ED8" },
+  { bg: "rgba(16, 163, 127, 0.12)", border: "rgba(16, 163, 127, 0.32)", text: "#0F8A6B" },
+  { bg: "rgba(217, 119, 6, 0.14)", border: "rgba(217, 119, 6, 0.32)", text: "#B45309" },
+  { bg: "rgba(219, 39, 119, 0.12)", border: "rgba(219, 39, 119, 0.32)", text: "#BE185D" },
+  { bg: "rgba(124, 58, 237, 0.12)", border: "rgba(124, 58, 237, 0.32)", text: "#6D28D9" },
+  { bg: "rgba(6, 182, 212, 0.12)", border: "rgba(6, 182, 212, 0.32)", text: "#0E7490" },
+];
+
+function getTagPaletteFrom(tag, palette) {
+  const key = String(tag?.id ?? tag?.title ?? "");
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return palette[hash % palette.length];
+}
+
+function getTagPalette(tag) {
+  return getTagPaletteFrom(tag, TAG_PALETTE);
+}
+
+function getTagPaletteLight(tag) {
+  return getTagPaletteFrom(tag, TAG_PALETTE_LIGHT);
+}
+
 function MobileNewsCard({ item, onCopy }) {
   const { title, preview_text, published_at, imagePreview, tags, page_url } = item;
   const dateStr = published_at
@@ -165,20 +204,31 @@ function MobileNewsCard({ item, onCopy }) {
         ) : null}
         {tags && tags.length > 0 ? (
           <Stack direction="row" flexWrap="wrap" gap={0.5}>
-            {tags.map((tag) => (
-              <Chip
-                key={tag.id}
-                label={tag.title}
-                size="small"
-                sx={{
-                  backgroundColor: tag.color,
-                  color: "#fff",
-                  fontFamily: "'Manrope', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "11px",
-                }}
-              />
-            ))}
+            {tags.map((tag) => {
+              const palette = getTagPalette(tag);
+              return (
+                <Chip
+                  key={tag.id}
+                  label={tag.title}
+                  size="small"
+                  sx={{
+                    backgroundColor: palette.bg,
+                    border: `1px solid ${palette.border}`,
+                    color: palette.text,
+                    fontFamily: "'Manrope', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "11px",
+                    height: "auto",
+                    "& .MuiChip-label": {
+                      px: "8px",
+                      py: "4px",
+                      whiteSpace: "normal",
+                      lineHeight: 1.3,
+                    },
+                  }}
+                />
+              );
+            })}
           </Stack>
         ) : null}
       </Box>
@@ -310,19 +360,30 @@ function NewsCard({ item, onCopy }) {
         )}
         {tags && tags.length > 0 && (
           <Stack direction="row" flexWrap="wrap" gap={0.5} sx={{ mt: "auto", pt: 1 }}>
-            {tags.map((tag) => (
-              <Chip
-                key={tag.id}
-                label={tag.title}
-                size="small"
-                sx={{
-                  backgroundColor: tag.color,
-                  color: "#fff",
-                  fontWeight: 500,
-                  fontSize: "0.7rem",
-                }}
-              />
-            ))}
+            {tags.map((tag) => {
+              const palette = getTagPaletteLight(tag);
+              return (
+                <Chip
+                  key={tag.id}
+                  label={tag.title}
+                  size="small"
+                  sx={{
+                    backgroundColor: palette.bg,
+                    border: `1px solid ${palette.border}`,
+                    color: palette.text,
+                    fontWeight: 600,
+                    fontSize: "0.7rem",
+                    height: "auto",
+                    "& .MuiChip-label": {
+                      px: "8px",
+                      py: "4px",
+                      whiteSpace: "normal",
+                      lineHeight: 1.3,
+                    },
+                  }}
+                />
+              );
+            })}
           </Stack>
         )}
       </CardContent>
@@ -340,8 +401,13 @@ function NewsPageView({ items, loading, error }) {
       return;
     }
 
+    const NEWS_ORIGIN = "https://bmstu.ru";
+    const absoluteUrl = /^https?:\/\//i.test(pageUrl)
+      ? pageUrl
+      : `${NEWS_ORIGIN}${pageUrl.startsWith("/") ? "" : "/"}${pageUrl}`;
+
     try {
-      await copyTextToClipboard(pageUrl);
+      await copyTextToClipboard(absoluteUrl);
       setSnackbar({ open: true, message: "Ссылка скопирована" });
     } catch {
       setSnackbar({ open: true, message: "Не удалось скопировать ссылку" });

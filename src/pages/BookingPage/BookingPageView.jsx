@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -23,6 +24,35 @@ import EmptyTableRow from "../../shared/ui/EmptyTableRow";
 import LabeledSelect from "../../shared/ui/LabeledSelect";
 import RoomAutocomplete, { ALL_ROOMS_ID } from "../../shared/ui/RoomAutocomplete";
 import SectionCard from "../../shared/ui/SectionCard";
+
+const TIME_STEP_MINUTES = 30;
+
+function parseMinutesOfDay(value) {
+  if (!value) return null;
+  const [h, m] = value.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
+function minutesToTimeString(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function snapToHalfHour(value, minValue, maxValue) {
+  const totalMinutes = parseMinutesOfDay(value);
+  const minMinutes = parseMinutesOfDay(minValue);
+  const maxMinutes = parseMinutesOfDay(maxValue);
+
+  if (totalMinutes === null) {
+    return minValue;
+  }
+
+  const rounded = Math.round(totalMinutes / TIME_STEP_MINUTES) * TIME_STEP_MINUTES;
+  const clamped = Math.min(Math.max(rounded, minMinutes), maxMinutes);
+  return minutesToTimeString(clamped);
+}
 
 const tableCompactCell = {
   py: 1.25,
@@ -74,6 +104,29 @@ const M = {
   freeBadgeBg: "#8BE8B5",
   freeBadgeText: "#1C2418",
 };
+
+function TimeStartInput({ value, min, max, onCommit, sx }) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  return (
+    <Box
+      component="input"
+      type="time"
+      step={TIME_STEP_MINUTES * 60}
+      min={min}
+      max={max}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => onCommit(snapToHalfHour(draft, min, max))}
+      onWheel={(e) => e.currentTarget.blur()}
+      sx={sx}
+    />
+  );
+}
 
 function MobileSelectInput({ label, value, onChange, children }) {
   return (
@@ -152,6 +205,34 @@ function MobileBookingView({
   roomMap,
 }) {
   const bookButtonDisabled = submitting || bookingDisabled;
+  const timeStartMin = timeSlots[0];
+  const timeStartMax = timeSlots[timeSlots.length - 2];
+
+  const [timeHighlighted, setTimeHighlighted] = useState(false);
+
+  useEffect(() => {
+    if (!timeHighlighted) {
+      return undefined;
+    }
+    const timer = setTimeout(() => setTimeHighlighted(false), 900);
+    return () => clearTimeout(timer);
+  }, [timeHighlighted]);
+
+  const handleTimeStartCommit = (nextValue) => {
+    setTimeStart(nextValue);
+    setTimeHighlighted(true);
+  };
+
+  const timeBoxSx = {
+    flex: 1,
+    background: M.inputBg,
+    border: `1px solid ${M.inputBorder}`,
+    borderRadius: "12px",
+    height: "42px",
+    display: "flex",
+    alignItems: "center",
+    px: "11px",
+  };
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -161,12 +242,12 @@ function MobileBookingView({
           background: M.sectionBg,
           border: `1px solid ${M.sectionBorder}`,
           borderRadius: "18px",
-          p: "15px",
+          p: "14px",
           boxShadow: "0px 10px 28px rgba(6, 10, 22, 0.33)",
         }}
       >
         {/* Date */}
-        <Box sx={{ mb: "17px" }}>
+        <Box sx={{ mb: "14px" }}>
           <Typography
             sx={{
               fontFamily: "'Manrope', sans-serif",
@@ -176,7 +257,7 @@ function MobileBookingView({
               letterSpacing: "0.531px",
               textTransform: "uppercase",
               color: M.labelColor,
-              mb: "8px",
+              mb: "6px",
             }}
           >
             Дата
@@ -186,10 +267,10 @@ function MobileBookingView({
               background: M.inputBg,
               border: `1px solid ${M.inputBorder}`,
               borderRadius: "12px",
-              height: "46px",
+              height: "42px",
               display: "flex",
               alignItems: "center",
-              px: "13px",
+              px: "11px",
             }}
           >
             <Box
@@ -213,120 +294,71 @@ function MobileBookingView({
         </Box>
 
         {/* Time */}
-        <Box sx={{ mb: "17px" }}>
-          <Typography
-            sx={{
-              fontFamily: "'Manrope', sans-serif",
-              fontWeight: 700,
-              fontSize: "13.3px",
-              lineHeight: "18px",
-              letterSpacing: "0.531px",
-              textTransform: "uppercase",
-              color: M.labelColor,
-              mb: "8px",
-            }}
-          >
-            Время
-          </Typography>
-          <Box sx={{ display: "flex", gap: "10px" }}>
-            <Box
+        <Box sx={{ mb: "14px" }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: "6px" }}>
+            <Typography
               sx={{
-                flex: 1,
-                background: M.inputBg,
-                border: `1px solid ${M.inputBorder}`,
-                borderRadius: "12px",
-                height: "46px",
-                display: "flex",
-                alignItems: "center",
-                px: "13px",
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 700,
+                fontSize: "13.3px",
+                lineHeight: "18px",
+                letterSpacing: "0.531px",
+                textTransform: "uppercase",
+                color: M.labelColor,
               }}
             >
-              <Select
-                size="small"
+              Время
+            </Typography>
+            <Typography
+              sx={{
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 500,
+                fontSize: "11px",
+                lineHeight: "14px",
+                color: M.bodyColor,
+              }}
+            >
+              Шаг 30 минут
+            </Typography>
+          </Stack>
+          <Box sx={{ display: "flex", gap: "8px" }}>
+            <Box sx={timeBoxSx}>
+              <TimeStartInput
                 value={timeStart}
-                onChange={(e) => setTimeStart(e.target.value)}
-                variant="standard"
-                disableUnderline
-                fullWidth
+                min={timeStartMin}
+                max={timeStartMax}
+                onCommit={handleTimeStartCommit}
                 sx={{
+                  width: "100%",
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
                   fontFamily: "'Manrope', sans-serif",
                   fontWeight: 400,
                   fontSize: "14.7px",
-                  color: M.inputColor,
-                  "& .MuiSelect-icon": { color: M.inputColor },
-                  "& .MuiSelect-select": { p: 0 },
+                  color: timeHighlighted ? M.freeBadgeBg : M.inputColor,
+                  transition: "color 0.25s ease",
+                  colorScheme: "dark",
                 }}
-              >
-                {timeSlots.slice(0, -1).map((t) => (
-                  <MenuItem key={t} value={t}>{t}</MenuItem>
-                ))}
-              </Select>
+              />
             </Box>
-            <Box
-              sx={{
-                flex: 1,
-                background: M.inputBg,
-                border: `1px solid ${M.inputBorder}`,
-                borderRadius: "12px",
-                height: "46px",
-                display: "flex",
-                alignItems: "center",
-                px: "13px",
-              }}
-            >
-              <Select
-                size="small"
-                value={timeEnd}
-                onChange={(e) => setTimeEnd(e.target.value)}
-                disabled
-                variant="standard"
-                disableUnderline
-                fullWidth
+            <Box sx={timeBoxSx}>
+              <Typography
                 sx={{
+                  width: "100%",
                   fontFamily: "'Manrope', sans-serif",
                   fontWeight: 400,
                   fontSize: "14.7px",
-                  color: M.inputColor,
-                  "& .MuiSelect-icon": { color: M.inputColor },
-                  "& .MuiSelect-select": { p: 0 },
+                  color: "#fff",
                 }}
               >
-                {timeSlots.slice(1).map((t) => (
-                  <MenuItem key={t} value={t}>{t}</MenuItem>
-                ))}
-              </Select>
+                {timeEnd}
+              </Typography>
             </Box>
           </Box>
         </Box>
 
-        <RoomAutocomplete
-          rooms={rooms}
-          value={selectedRoomId}
-          onChange={setSelectedRoomId}
-          label="Аудитория"
-          placeholder="Например, 10"
-          sx={{
-            "& .MuiInputLabel-root": {
-              fontFamily: "'Manrope', sans-serif",
-              fontWeight: 700,
-              fontSize: "13.3px",
-              letterSpacing: "0.531px",
-              textTransform: "uppercase",
-              color: M.labelColor,
-            },
-            "& .MuiOutlinedInput-root": {
-              background: M.inputBg,
-              borderRadius: "12px",
-              fontFamily: "'Manrope', sans-serif",
-              color: M.inputColor,
-              "& fieldset": { borderColor: M.inputBorder },
-              "&:hover fieldset": { borderColor: M.inputBorder },
-              "&.Mui-focused fieldset": { borderColor: M.inputBorder },
-            },
-          }}
-        />
-
-        <Box sx={{ mt: "17px" }}>
+        <Box sx={{ mb: "14px" }}>
           <Typography
             sx={{
               fontFamily: "'Manrope', sans-serif",
@@ -336,7 +368,66 @@ function MobileBookingView({
               letterSpacing: "0.531px",
               textTransform: "uppercase",
               color: M.labelColor,
-              mb: "8px",
+              mb: "6px",
+            }}
+          >
+            Аудитория
+          </Typography>
+          <Box
+            sx={{
+              background: M.inputBg,
+              border: `1px solid ${M.inputBorder}`,
+              borderRadius: "12px",
+              height: "42px",
+              display: "flex",
+              alignItems: "center",
+              px: "11px",
+            }}
+          >
+            <RoomAutocomplete
+              rooms={rooms}
+              value={selectedRoomId}
+              onChange={setSelectedRoomId}
+              label={null}
+              placeholder="Например, 100"
+              sx={{
+                width: "100%",
+                "& .MuiOutlinedInput-root": {
+                  background: "transparent",
+                  fontFamily: "'Manrope', sans-serif",
+                  fontWeight: 400,
+                  fontSize: "14.7px",
+                  color: M.inputColor,
+                  p: "0 !important",
+                  "& fieldset": { border: "none" },
+                  "&:hover fieldset": { border: "none" },
+                  "&.Mui-focused fieldset": { border: "none" },
+                },
+                "& .MuiAutocomplete-input": {
+                  fontFamily: "'Manrope', sans-serif",
+                  fontWeight: 400,
+                  fontSize: "14.7px",
+                  textAlign: "center",
+                  p: "0 !important",
+                },
+                "& .MuiAutocomplete-popupIndicator": { color: M.labelColor },
+                "& .MuiAutocomplete-clearIndicator": { color: M.labelColor },
+              }}
+            />
+          </Box>
+        </Box>
+
+        <Box>
+          <Typography
+            sx={{
+              fontFamily: "'Manrope', sans-serif",
+              fontWeight: 700,
+              fontSize: "13.3px",
+              lineHeight: "18px",
+              letterSpacing: "0.531px",
+              textTransform: "uppercase",
+              color: M.labelColor,
+              mb: "6px",
             }}
           >
             Имя
@@ -346,10 +437,10 @@ function MobileBookingView({
               background: M.inputBg,
               border: `1px solid ${M.inputBorder}`,
               borderRadius: "12px",
-              height: "46px",
+              height: "42px",
               display: "flex",
               alignItems: "center",
-              px: "13px",
+              px: "11px",
             }}
           >
             <Box
@@ -384,7 +475,7 @@ function MobileBookingView({
           ) : null}
         </Box>
 
-        <Box sx={{ mt: "17px" }}>
+        <Box sx={{ mt: "14px" }}>
           <Typography
             sx={{
               fontFamily: "'Manrope', sans-serif",
@@ -394,7 +485,7 @@ function MobileBookingView({
               letterSpacing: "0.531px",
               textTransform: "uppercase",
               color: M.labelColor,
-              mb: "8px",
+              mb: "6px",
             }}
           >
             Контакт
@@ -404,10 +495,10 @@ function MobileBookingView({
               background: M.inputBg,
               border: `1px solid ${fieldErrors.contact ? "#ff6b6b" : M.inputBorder}`,
               borderRadius: "12px",
-              height: "46px",
+              height: "42px",
               display: "flex",
               alignItems: "center",
-              px: "13px",
+              px: "11px",
             }}
           >
             <Box
@@ -449,7 +540,7 @@ function MobileBookingView({
               fontFamily: "'Manrope', sans-serif",
               fontSize: "13px",
               color: "#ff6b6b",
-              mt: "12px",
+              mt: "10px",
             }}
           >
             {error}
@@ -461,7 +552,7 @@ function MobileBookingView({
               fontFamily: "'Manrope', sans-serif",
               fontSize: "13px",
               color: M.freeBadgeBg,
-              mt: "12px",
+              mt: "10px",
             }}
           >
             {success}
@@ -476,7 +567,7 @@ function MobileBookingView({
           sx={{
             width: "100%",
             height: "40px",
-            mt: "18px",
+            mt: "16px",
             background: bookButtonDisabled ? "rgba(42, 109, 240, 0.5)" : M.primaryBtnBg,
             border: `1px solid ${M.primaryBtnBorder}`,
             borderRadius: "12px",

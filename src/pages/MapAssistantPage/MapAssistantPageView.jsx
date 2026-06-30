@@ -42,12 +42,12 @@ function MessageBubble({ message, onActionClick }) {
         overflow: "hidden",
       }}
     >
-      <Box sx={{ px: 1.5, py: 1.25 }}>
+      <Box sx={{ px: 1.75, py: 1.4 }}>
         <Typography
           sx={{
             fontFamily: "'Manrope', sans-serif",
             fontSize: 14,
-            lineHeight: 1.4,
+            lineHeight: 1.5,
             whiteSpace: "pre-wrap",
           }}
         >
@@ -164,7 +164,7 @@ function ChatInput({
       alignItems="stretch"
       sx={{
         mt: "auto",
-        pt: 1,
+        pt: 1.25,
         borderTop: dark ? "1px solid #253654" : "1px solid #d8e0ea",
       }}
     >
@@ -210,19 +210,23 @@ function MobileAssistantView({
   canClearChat,
 }) {
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 2, mt: 0.5 }}>
       <Box
         sx={{
           background: "linear-gradient(180deg, rgba(24, 40, 66, 0.58) 0%, rgba(18, 31, 53, 0.95) 100%), #121F35",
-          borderRadius: "18px",
-          p: "15px",
+          borderRadius: 0,
+          px: "20px",
+          py: "18px",
           boxShadow: "0px 10px 28px rgba(6, 10, 22, 0.33)",
-          minHeight: "74vh",
+          flex: 1,
+          minHeight: 0,
           display: "flex",
           flexDirection: "column",
+          mx: -2,
+          width: "calc(100% + 32px)",
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
           <Typography sx={{ color: "#ECF2FF", fontWeight: 800, fontSize: 15 }}>
             {"ИИ-чат карты"}
           </Typography>
@@ -230,15 +234,15 @@ function MobileAssistantView({
         </Stack>
 
         {isContextLoading ? (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ color: "#AFBFDE", mb: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ color: "#AFBFDE", mb: 1.25 }}>
             <CircularProgress size={16} sx={{ color: "#AFBFDE" }} />
             <Typography sx={{ fontSize: 13 }}>{"Загрузка контекста карты..."}</Typography>
           </Stack>
         ) : null}
 
-        {contextError ? <Alert severity="warning" sx={{ mb: 1 }}>{contextError}</Alert> : null}
+        {contextError ? <Alert severity="warning" sx={{ mb: 1.25 }}>{contextError}</Alert> : null}
 
-        <Stack spacing={1} sx={{ flex: 1, minHeight: 0, overflowY: "auto", pr: 0.5, mb: 1.5 }}>
+        <Stack spacing={1.25} sx={{ flex: 1, minHeight: 0, overflowY: "auto", pr: 0.5, mb: 1.75 }}>
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} onActionClick={onActionClick} />
           ))}

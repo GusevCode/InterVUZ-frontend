@@ -281,7 +281,11 @@ export default function MapRoutePlanner({
       ) : null}
 
       <Box>
-        <Typography variant="caption" color="text.secondary" sx={dark ? { color: D.labelColor } : {}}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mb: 1.25, ...(dark ? { color: D.labelColor } : {}) }}
+        >
           Откуда
         </Typography>
         <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
@@ -311,7 +315,11 @@ export default function MapRoutePlanner({
       </Box>
 
       <Box>
-        <Typography variant="caption" color="text.secondary" sx={dark ? { color: D.labelColor } : {}}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mb: 1.25, ...(dark ? { color: D.labelColor } : {}) }}
+        >
           Куда
         </Typography>
         <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>

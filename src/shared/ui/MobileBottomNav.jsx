@@ -77,15 +77,37 @@ function ScheduleIcon({ active }) {
   );
 }
 
-function ServicesIcon({ active }) {
+function BookingIcon({ active }) {
   const c = active ? C_ACTIVE : C_INACTIVE;
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <g opacity="0.9">
-        <path d="M6.33333 2H3C2.44772 2 2 2.44772 2 3V6.33333C2 6.88562 2.44772 7.33333 3 7.33333H6.33333C6.88562 7.33333 7.33333 6.88562 7.33333 6.33333V3C7.33333 2.44772 6.88562 2 6.33333 2Z" stroke={c} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M13 2H9.66667C9.11439 2 8.66667 2.44772 8.66667 3V6.33333C8.66667 6.88562 9.11439 7.33333 9.66667 7.33333H13C13.5523 7.33333 14 6.88562 14 6.33333V3C14 2.44772 13.5523 2 13 2Z" stroke={c} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M6.33333 8.66663H3C2.44772 8.66663 2 9.11434 2 9.66663V13C2 13.5522 2.44772 14 3 14H6.33333C6.88562 14 7.33333 13.5522 7.33333 13V9.66663C7.33333 9.11434 6.88562 8.66663 6.33333 8.66663Z" stroke={c} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M13 8.66663H9.66667C9.11439 8.66663 8.66667 9.11434 8.66667 9.66663V13C8.66667 13.5522 9.11439 14 9.66667 14H13C13.5523 14 14 13.5522 14 13V9.66663C14 9.11434 13.5523 8.66663 13 8.66663Z" stroke={c} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="5.5" cy="5.5" r="2.5" stroke={c} strokeWidth="1.2" />
+        <path
+          d="M7.4 7.4L13 13M9.6 10.6L11.2 12.2M11.2 8.8L12.8 10.4"
+          stroke={c}
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+    </svg>
+  );
+}
+
+function NewsIcon({ active }) {
+  const c = active ? C_ACTIVE : C_INACTIVE;
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <g opacity="0.9">
+        <rect x="2.33" y="3" width="11.33" height="10" rx="1.5" stroke={c} strokeWidth="1.2" />
+        <path
+          d="M4.83 6h6.33M4.83 8.5h6.33M4.83 11h3.5"
+          stroke={c}
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </g>
     </svg>
   );
@@ -93,9 +115,10 @@ function ServicesIcon({ active }) {
 
 const NAV_TABS = [
   { label: "Карта", path: "/map", Icon: MapIcon },
-  { label: "Чат", path: "/assistant", Icon: AssistantIcon },
   { label: "Расписание", path: "/schedule", Icon: ScheduleIcon },
-  { label: "Новости", path: "/news", Icon: ServicesIcon },
+  { label: "Брони", path: "/booking", Icon: BookingIcon },
+  { label: "Новости", path: "/news", Icon: NewsIcon },
+  { label: "Чат", path: "/assistant", Icon: AssistantIcon },
 ];
 
 function MobileBottomNav() {
@@ -116,14 +139,15 @@ function MobileBottomNav() {
         bottom: 0,
         left: 0,
         right: 0,
-        height: "72px",
+        minHeight: "72px",
         bgcolor: "rgba(10, 17, 30, 0.95)",
         borderTop: "1px solid #253654",
         display: { xs: "flex", sm: "none" },
         alignItems: "center",
         zIndex: 1200,
-        px: "8px",
-        gap: "4px",
+        px: "6px",
+        gap: "3px",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
       {NAV_TABS.map(({ label, path, Icon }) => {
@@ -134,12 +158,13 @@ function MobileBottomNav() {
             onClick={() => navigate(path)}
             sx={{
               flex: 1,
+              minWidth: 0,
               height: "50px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: "5px",
+              gap: "4px",
               borderRadius: "10px",
               cursor: "pointer",
               bgcolor: active ? "#1A2D4C" : "transparent",
@@ -152,9 +177,10 @@ function MobileBottomNav() {
               sx={{
                 fontFamily: "'Manrope', sans-serif",
                 fontWeight: 700,
-                fontSize: "11.5px",
-                lineHeight: "12px",
+                fontSize: "10.3px",
+                lineHeight: "11px",
                 color: active ? C_ACTIVE : C_INACTIVE,
+                whiteSpace: "nowrap",
               }}
             >
               {label}
