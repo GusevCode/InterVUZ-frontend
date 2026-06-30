@@ -10,7 +10,17 @@ function filterRouteNodes(nodes, inputValue) {
   if (!q) {
     return nodes;
   }
-  return nodes.filter((node) => getRouteNodeLabel(node).toLowerCase().includes(q));
+
+  return nodes.filter((node) => {
+    const label = getRouteNodeLabel(node);
+    const normalizedLabel = label.toLowerCase();
+    if (normalizedLabel.includes(q)) {
+      return true;
+    }
+
+    const roomCode = label.replace(/^аудитория\s*/i, "").replace(/^ауд\.?\s*/i, "").trim().toLowerCase();
+    return roomCode.includes(q);
+  });
 }
 
 function RouteNodeAutocomplete({

@@ -31,8 +31,62 @@ export function isRouteNodeVisibleInPicker(node) {
   return true;
 }
 
+function sortRouteNodeLabels(nodes) {
+  return [...nodes].sort((left, right) => {
+    const leftLabel = String(left?.label ?? left?.title ?? left?.id ?? "");
+    const rightLabel = String(right?.label ?? right?.title ?? right?.id ?? "");
+    return leftLabel.localeCompare(rightLabel, "ru", { numeric: true, sensitivity: "base" });
+  });
+}
+
+export function getRouteNodeIdForElement(elementId = "") {
+  const raw = String(elementId ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const roomMatch = raw.match(/^room-(.+)$/i);
+  if (!roomMatch) {
+    return null;
+  }
+
+  return `n_r_${roomMatch[1]}`;
+}
+
+export function getElementIdForRouteNode(nodeId = "") {
+  const raw = String(nodeId ?? "").trim();
+  const roomMatch = raw.match(/^n_r_(.+)$/i);
+  if (!roomMatch) {
+    return null;
+  }
+
+  return `room-${roomMatch[1]}`;
+}
+
 export function filterSelectableRouteNodes(nodes) {
-  return (nodes ?? []).filter(isRouteNodeVisibleInPicker);
+  const list = nodes ?? [];
+  const auditoriumNodesByPrefix = list.filter((node) => (
+    /^n_r_/i.test(String(node.id ?? ""))
+    && isRouteNodeVisibleInPicker(node)
+  ));
+
+  if (auditoriumNodesByPrefix.length > 0) {
+    return sortRouteNodeLabels(auditoriumNodesByPrefix);
+  }
+
+  const auditoriumNodesByLabel = list.filter((node) => {
+    const label = String(node?.label ?? node?.title ?? "").trim();
+    if (!/^ауд/i.test(label)) {
+      return false;
+    }
+    return isRouteNodeVisibleInPicker(node);
+  });
+
+  if (auditoriumNodesByLabel.length > 0) {
+    return sortRouteNodeLabels(auditoriumNodesByLabel);
+  }
+
+  return sortRouteNodeLabels(list.filter(isRouteNodeVisibleInPicker));
 }
 
 export function buildGraph(graph) {
@@ -179,6 +233,28 @@ export function findShortestPath(graphData, fromId, toId) {
   return { path, distance: distances.get(toId) ?? Number.POSITIVE_INFINITY };
 }
 
+export function simplifyRoutePoints(points, epsilon = 0.75) {
+  if (!Array.isArray(points) || points.length <= 2) {
+    return points ?? [];
+  }
+
+  const simplified = [points[0]];
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = simplified[simplified.length - 1];
+    const current = points[index];
+    const next = points[index + 1];
+    const cross = Math.abs(
+      (current.x - previous.x) * (next.y - previous.y)
+      - (current.y - previous.y) * (next.x - previous.x),
+    );
+    if (cross > epsilon) {
+      simplified.push(current);
+    }
+  }
+  simplified.push(points[points.length - 1]);
+  return simplified;
+}
+
 export function pathToPoints(graphData, path) {
   if (!Array.isArray(path) || path.length < 2) {
     const single = graphData.nodeMap.get(path?.[0]);
@@ -205,7 +281,7 @@ export function pathToPoints(graphData, path) {
     });
   }
 
-  return points;
+  return simplifyRoutePoints(points);
 }
 
 export function isTransferNode(node) {

@@ -95,6 +95,17 @@ function getPoiColor(type) {
   return POI_COLORS[normalized] ?? POI_COLORS.other;
 }
 
+function isRoomElement(element) {
+  if (!element) {
+    return false;
+  }
+  if (element.kind === "room") {
+    return true;
+  }
+  const id = String(element.id ?? "");
+  return /^room-/i.test(id) && !/^room-line-/i.test(id);
+}
+
 function CameraRig({ width, height }) {
   const { camera, size } = useThree();
 
@@ -125,9 +136,17 @@ export default function Map3D({
   routePoints = [],
 }) {
   const [hoveredId, setHoveredId] = useState(null);
-  const sourceElements = useMemo(
+  const allElements = useMemo(
     () => (mapVector?.elements ?? []).filter((element) => element?.d),
     [mapVector],
+  );
+  const sourceElements = useMemo(
+    () => allElements.filter((element) => element.kind !== "wall"),
+    [allElements],
+  );
+  const wallElements = useMemo(
+    () => allElements.filter((element) => element.kind === "wall"),
+    [allElements],
   );
   const sourcePois = useMemo(
     () => (mapVector?.pois ?? [])
@@ -171,10 +190,14 @@ export default function Map3D({
         return [];
       }
 
-      const id = item.element?.id ?? null;
-      const isRoom = typeof id === "string" && id.toLowerCase().startsWith("room");
+      const element = item.element ?? null;
+      const id = element?.id ?? null;
+      const isRoom = isRoomElement(element);
       const color = isRoom ? MAP_PALETTE.room : MAP_PALETTE.base;
       const depth = isRoom ? roomDepth : baseDepth;
+      const elementOpacity = Number.isFinite(element?.fillOpacity)
+        ? element.fillOpacity
+        : getOpacity(item.style);
       const geometry = new THREE.ExtrudeGeometry(item.shape, {
         depth,
         bevelEnabled: false,
@@ -184,12 +207,64 @@ export default function Map3D({
         key: `f-${item.key}-${fill}`,
         geometry,
         color,
-        opacity: getOpacity(item.style),
+        opacity: elementOpacity,
         id,
         depth,
+        isRoom,
       }];
     })
   ), [shapes, baseDepth, roomDepth]);
+
+  const wallStrokeMeshes = useMemo(() => {
+    if (!wallElements.length) {
+      return [];
+    }
+
+    const wallSvg = buildSvgText({
+      viewBox,
+      width,
+      height,
+      elements: wallElements,
+    });
+    const wallParsed = new SVGLoader().parse(wallSvg);
+    const wallZ = baseDepth + 0.5;
+
+    return wallParsed.paths.flatMap((path, pathIndex) => {
+      const style = path.userData?.style ?? {};
+      const stroke = style.stroke;
+      if (!stroke || stroke === "none") {
+        return [];
+      }
+
+      const rawWidth = parseNumber(style.strokeWidth, 1);
+      const strokeWidth = Math.max(0.35, Math.min(0.85, rawWidth * 0.28));
+      const strokeStyle = SVGLoader.getStrokeStyle(
+        strokeWidth,
+        stroke,
+        style.strokeLinejoin ?? "miter",
+        style.strokeLinecap ?? "butt",
+        parseNumber(style.strokeMiterlimit, 4),
+      );
+
+      return path.subPaths.flatMap((subPath, subIndex) => {
+        const points = subPath.getPoints();
+        const geometry = SVGLoader.pointsToStroke(points, strokeStyle);
+        if (!geometry) {
+          return [];
+        }
+
+        const element = wallElements[pathIndex] ?? null;
+        return [{
+          key: `w-${pathIndex}-${subIndex}`,
+          geometry,
+          color: MAP_PALETTE.stroke,
+          opacity: getStrokeOpacity(style),
+          id: element?.id ?? null,
+          position: [0, 0, wallZ],
+        }];
+      });
+    });
+  }, [wallElements, viewBox, width, height, baseDepth]);
 
   const strokeMeshes = useMemo(() => (
     parsed.paths.flatMap((path, pathIndex) => {
@@ -229,9 +304,9 @@ export default function Map3D({
 
   const outlineMeshes = useMemo(() => (
     shapes.flatMap((item) => {
-      const id = item.element?.id ?? null;
-      const isRoom = typeof id === "string" && id.toLowerCase().startsWith("room");
-      if (!isRoom) {
+      const element = item.element ?? null;
+      const id = element?.id ?? null;
+      if (!isRoomElement(element)) {
         return [];
       }
       const points = item.shape.getSpacedPoints(120).map((point) => new THREE.Vector3(point.x, point.y, roomDepth + 0.6));
@@ -252,7 +327,7 @@ export default function Map3D({
     const pathPoints = routePoints.map((point) => new THREE.Vector3(point.x, point.y, routeZ));
     const curve = new THREE.CatmullRomCurve3(pathPoints, false, "centripetal");
     const segments = Math.max(16, pathPoints.length * 6);
-    return new THREE.TubeGeometry(curve, segments, 2.2, 14, false);
+    return new THREE.TubeGeometry(curve, segments, 1.5, 12, false);
   }, [routePoints, baseDepth]);
 
   const poiMarkers = useMemo(() => (
@@ -267,17 +342,25 @@ export default function Map3D({
   ), [sourcePois, baseDepth, roomDepth]);
 
   const meshes = useMemo(
-    () => [...fillMeshes, ...strokeMeshes, ...outlineMeshes].concat(routeGeometry ? [{ geometry: routeGeometry }] : []),
-    [fillMeshes, strokeMeshes, outlineMeshes, routeGeometry],
+    () => [
+      ...fillMeshes,
+      ...wallStrokeMeshes,
+      ...strokeMeshes,
+      ...outlineMeshes,
+    ].concat(routeGeometry ? [{ geometry: routeGeometry }] : []),
+    [fillMeshes, wallStrokeMeshes, strokeMeshes, outlineMeshes, routeGeometry],
   );
 
   const labelItems = useMemo(() => (
     shapes.flatMap((item) => {
-      const id = item.element?.id ?? null;
-      const isRoom = typeof id === "string" && id.toLowerCase().startsWith("room");
-      const rawLabel = item.element?.title || item.element?.label || id;
+      const element = item.element ?? null;
+      const id = element?.id ?? null;
+      if (!isRoomElement(element)) {
+        return [];
+      }
+      const rawLabel = element?.title || element?.label || id;
       const label = typeof rawLabel === "string" ? rawLabel.replace(/^room-?/i, "") : rawLabel;
-      if (!isRoom || !label) {
+      if (!label) {
         return [];
       }
       const points = item.shape.getSpacedPoints(80);
@@ -457,9 +540,24 @@ export default function Map3D({
           <planeGeometry args={[width * 1.3, height * 1.3]} />
           <shadowMaterial opacity={0.25} />
         </mesh>
+        {wallStrokeMeshes.map((mesh) => (
+          <mesh
+            key={mesh.key}
+            geometry={mesh.geometry}
+            position={mesh.position}
+            castShadow
+            receiveShadow
+          >
+            <meshStandardMaterial
+              color={mesh.color}
+              metalness={0.08}
+              roughness={0.72}
+            />
+          </mesh>
+        ))}
         {fillMeshes.map((mesh) => {
-          const isSelected = mesh.id && mesh.id === selectedId;
-          const isHovered = mesh.id && mesh.id === hoveredId;
+          const isSelected = mesh.isRoom && mesh.id && mesh.id === selectedId;
+          const isHovered = mesh.isRoom && mesh.id && mesh.id === hoveredId;
           const tint = isSelected ? MAP_PALETTE.selected : isHovered ? MAP_PALETTE.hover : mesh.color;
           return (
             <mesh
@@ -468,16 +566,24 @@ export default function Map3D({
               castShadow
               receiveShadow
               onPointerDown={(event) => {
+                if (!mesh.isRoom || !mesh.id) {
+                  return;
+                }
                 event.stopPropagation();
                 handleSelect(mesh.id);
               }}
               onPointerOver={(event) => {
+                if (!mesh.isRoom || !mesh.id) {
+                  return;
+                }
                 event.stopPropagation();
-                if (mesh.id) {
-                  setHoveredId(mesh.id);
+                setHoveredId(mesh.id);
+              }}
+              onPointerOut={() => {
+                if (mesh.isRoom && mesh.id === hoveredId) {
+                  setHoveredId(null);
                 }
               }}
-              onPointerOut={() => setHoveredId(null)}
             >
               <meshStandardMaterial
                 color={tint}

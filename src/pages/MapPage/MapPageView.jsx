@@ -17,6 +17,7 @@ import { buildBookingUrl } from "../../shared/bookingForm";
 import MapRoutePlanner from "../../components/MapRoutePlanner";
 import MapMultiFloorRouteView from "../../components/MapMultiFloorRouteView";
 import FloorChipSlider from "../../shared/ui/FloorChipSlider";
+import { getFloorFromMapId } from "../../entities/map/routeGraphLib";
 
 const M = {
   labelColor: "#AFBFDE",
@@ -63,6 +64,7 @@ function MobileMapView({
   handleSelectFloor,
   handleRouteFloorChange,
   setLocalRoutePoints,
+  activeMapFloor,
   routeFromPlaceId,
   routeToPlaceId,
   selectedPlace,
@@ -345,6 +347,8 @@ function MobileMapView({
           onSingleFloorRouteChange={setLocalRoutePoints}
           onMultiFloorRouteChange={setMultiFloorRoute}
           onRouteFloorChange={handleRouteFloorChange}
+          activeFloor={activeMapFloor}
+          selectedElementId={selectedVectorId}
           dark
         />
       </Box>
@@ -450,6 +454,7 @@ function MapPageView({
   getRoutePointCoordinates,
 }) {
   const isMobile = useMediaQuery("(max-width:600px)");
+  const activeMapFloor = getFloorFromMapId(selectedMapId);
 
   if (isMobile) {
     return (
@@ -496,6 +501,7 @@ function MapPageView({
         handleRouteFloorChange={handleRouteFloorChange}
         mapVectors={mapVectors}
         setLocalRoutePoints={setLocalRoutePoints}
+        activeMapFloor={activeMapFloor}
         selectedPlace={selectedPlace}
         scheduleDate={scheduleDate}
         setScheduleDate={setScheduleDate}
@@ -548,6 +554,8 @@ function MapPageView({
                     onSingleFloorRouteChange={setLocalRoutePoints}
                     onMultiFloorRouteChange={setMultiFloorRoute}
                     onRouteFloorChange={handleRouteFloorChange}
+                    activeFloor={activeMapFloor}
+                    selectedElementId={selectedVectorId}
                   />
                   <Divider />
                 </>

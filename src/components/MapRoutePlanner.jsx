@@ -13,6 +13,7 @@ import {
   filterSelectableRouteNodes,
   findShortestPath,
   getGraphForFloor,
+  getRouteNodeIdForElement,
   listRoutableFloors,
   pathToPoints,
 } from "../entities/map/routeGraphLib";
@@ -33,6 +34,8 @@ export default function MapRoutePlanner({
   onSingleFloorRouteChange,
   onMultiFloorRouteChange,
   onRouteFloorChange,
+  activeFloor = null,
+  selectedElementId = "",
   dark = false,
 }) {
   const routableFloors = useMemo(() => listRoutableFloors(mapGraphs), [mapGraphs]);
@@ -49,6 +52,23 @@ export default function MapRoutePlanner({
   const toNodes = toFloorData?.nodes ?? [];
   const fromSelectableNodes = useMemo(() => filterSelectableRouteNodes(fromNodes), [fromNodes]);
   const toSelectableNodes = useMemo(() => filterSelectableRouteNodes(toNodes), [toNodes]);
+  const selectedRouteNodeId = useMemo(() => {
+    const routeNodeId = getRouteNodeIdForElement(selectedElementId);
+    if (!routeNodeId) {
+      return "";
+    }
+
+    const activeFloorNumber = Number(activeFloor);
+    if (Number.isFinite(activeFloorNumber) && activeFloorNumber !== fromFloor) {
+      return "";
+    }
+
+    const existsOnFloor = fromNodes.some((node) => node.id === routeNodeId);
+    return existsOnFloor ? routeNodeId : "";
+  }, [selectedElementId, activeFloor, fromFloor, fromNodes]);
+  const usesAuditoriumNodes = fromSelectableNodes.some((node) => /^n_r_/i.test(String(node.id ?? "")))
+    || fromSelectableNodes.some((node) => /^ауд/i.test(String(node.label ?? "")));
+  const nodePlaceholder = usesAuditoriumNodes ? "Номер аудитории, например 208" : "Начните вводить точку…";
 
   useEffect(() => {
     if (routableFloors.length === 0) {
@@ -65,8 +85,11 @@ export default function MapRoutePlanner({
       return;
     }
 
-    const nextFromFloor = routableFloors[0].floor;
-    const nextToFloor = routableFloors[routableFloors.length > 1 ? 1 : 0].floor;
+    const preferredFloor = Number.isFinite(Number(activeFloor))
+      ? routableFloors.find((item) => item.floor === Number(activeFloor))?.floor
+      : null;
+    const nextFromFloor = preferredFloor ?? routableFloors[0].floor;
+    const nextToFloor = preferredFloor ?? routableFloors[0].floor;
     setFromFloor(nextFromFloor);
     setToFloor(nextToFloor);
     setError("");
@@ -76,7 +99,20 @@ export default function MapRoutePlanner({
     if (typeof onMultiFloorRouteChange === "function") {
       onMultiFloorRouteChange(null);
     }
-  }, [routableFloors, onSingleFloorRouteChange, onMultiFloorRouteChange]);
+  }, [routableFloors, activeFloor, onSingleFloorRouteChange, onMultiFloorRouteChange]);
+
+  useEffect(() => {
+    if (!Number.isFinite(Number(activeFloor))) {
+      return;
+    }
+
+    const nextFloor = Number(activeFloor);
+    if (!routableFloors.some((item) => item.floor === nextFloor)) {
+      return;
+    }
+
+    setFromFloor(nextFloor);
+  }, [activeFloor, routableFloors]);
 
   useEffect(() => {
     if (!fromFloorData) {
@@ -207,8 +243,42 @@ export default function MapRoutePlanner({
             : {}
         }
       >
-        Маршрут по разметке
+        {usesAuditoriumNodes ? "Маршрут между аудиториями" : "Маршрут по разметке"}
       </Typography>
+
+      {selectedRouteNodeId ? (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Typography variant="caption" color="text.secondary" sx={dark ? { color: D.labelColor } : {}}>
+            Выбрана аудитория на карте
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setFromNodeId(selectedRouteNodeId);
+              if (Number.isFinite(Number(activeFloor))) {
+                setFromFloor(Number(activeFloor));
+              }
+            }}
+            sx={dark ? { color: D.btnText, borderColor: D.btnBorder } : {}}
+          >
+            Откуда
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setToNodeId(selectedRouteNodeId);
+              if (Number.isFinite(Number(activeFloor))) {
+                setToFloor(Number(activeFloor));
+              }
+            }}
+            sx={dark ? { color: D.btnText, borderColor: D.btnBorder } : {}}
+          >
+            Куда
+          </Button>
+        </Stack>
+      ) : null}
 
       <Box>
         <Typography variant="caption" color="text.secondary" sx={dark ? { color: D.labelColor } : {}}>
@@ -233,6 +303,7 @@ export default function MapRoutePlanner({
             nodes={fromSelectableNodes}
             value={fromNodeId}
             onChange={setFromNodeId}
+            placeholder={nodePlaceholder}
             inputSx={{ ...inputSx, flex: 1 }}
             sx={{ flex: 1 }}
           />
@@ -262,6 +333,7 @@ export default function MapRoutePlanner({
             nodes={toSelectableNodes}
             value={toNodeId}
             onChange={setToNodeId}
+            placeholder={nodePlaceholder}
             inputSx={{ ...inputSx, flex: 1 }}
             sx={{ flex: 1 }}
           />
