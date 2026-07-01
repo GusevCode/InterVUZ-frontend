@@ -26,15 +26,24 @@ export async function apiRequest(path, options = {}) {
     ...restOptions
   } = options;
 
-  const response = await fetch(buildUrl(path, query), {
+  let response;
 
-    ...restOptions,
-    headers: {
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(headers ?? {}),
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
+  try {
+    response = await fetch(buildUrl(path, query), {
+      ...restOptions,
+      headers: {
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(headers ?? {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch (error) {
+    const message = error?.message || "";
+    if (message === "Failed to fetch" || error instanceof TypeError) {
+      throw new Error("Сервер недоступен. Убедитесь, что бэкенд запущен на порту 8000.");
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     let errorMessage = `Запрос ${path} упал с кодом ${response.status}`;
