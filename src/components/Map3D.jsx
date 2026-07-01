@@ -291,14 +291,8 @@ function MapCameraController({
     const shouldResetTarget = mapChanged || !initializedRef.current;
 
     if (lockCameraCenter) {
-      if (!mapChanged && initializedRef.current) {
-        return;
-      }
       camera.aspect = viewAspect;
       camera.updateProjectionMatrix();
-      // Always fully reset (never rescale from a prior position) so the
-      // locked view can never drift away from dead-center, regardless of
-      // resize events.
       resetOrbitCamera({ camera, controls, fitDist });
       initializedRef.current = true;
       lastFitDistRef.current = fitDist;
@@ -781,9 +775,10 @@ export default function Map3D({
   }, [meshes]);
 
   function handleSelect(id) {
-    if (typeof onSelect === "function") {
-      onSelect(id ?? "");
+    if (lockCameraCenter || typeof onSelect !== "function") {
+      return;
     }
+    onSelect(id ?? "");
   }
 
   return (
@@ -793,9 +788,10 @@ export default function Map3D({
       width: "100%",
       height: "100%",
       overflow: "hidden",
-      touchAction: "none",
-      overscrollBehavior: "none",
+      touchAction: lockCameraCenter ? "none" : undefined,
+      overscrollBehavior: lockCameraCenter ? "none" : undefined,
       pointerEvents: lockCameraCenter ? "none" : undefined,
+      userSelect: lockCameraCenter ? "none" : undefined,
     }}
     >
       <Canvas
@@ -806,7 +802,9 @@ export default function Map3D({
           width: "100%",
           height: "100%",
           display: "block",
-          touchAction: "none",
+          touchAction: lockCameraCenter ? "none" : undefined,
+          pointerEvents: lockCameraCenter ? "none" : undefined,
+          userSelect: lockCameraCenter ? "none" : undefined,
         }}
       >
         <MapCanvasResizeBridge />
@@ -856,21 +854,21 @@ export default function Map3D({
               geometry={mesh.geometry}
               castShadow
               receiveShadow
-              onPointerDown={(event) => {
+              onPointerDown={lockCameraCenter ? undefined : (event) => {
                 if (!mesh.isRoom || !mesh.id) {
                   return;
                 }
                 event.stopPropagation();
                 handleSelect(mesh.id);
               }}
-              onPointerOver={(event) => {
+              onPointerOver={lockCameraCenter ? undefined : (event) => {
                 if (!mesh.isRoom || !mesh.id) {
                   return;
                 }
                 event.stopPropagation();
                 setHoveredId(mesh.id);
               }}
-              onPointerOut={() => {
+              onPointerOut={lockCameraCenter ? undefined : () => {
                 if (mesh.isRoom && mesh.id === hoveredId) {
                   setHoveredId(null);
                 }
@@ -920,15 +918,15 @@ export default function Map3D({
               scale={[scale, scale, scale]}
               castShadow
               receiveShadow
-              onPointerDown={(event) => {
+              onPointerDown={lockCameraCenter ? undefined : (event) => {
                 event.stopPropagation();
                 handleSelect(poi.id);
               }}
-              onPointerOver={(event) => {
+              onPointerOver={lockCameraCenter ? undefined : (event) => {
                 event.stopPropagation();
                 setHoveredId(poi.id);
               }}
-              onPointerOut={() => setHoveredId(null)}
+              onPointerOut={lockCameraCenter ? undefined : () => setHoveredId(null)}
             >
               <sphereGeometry args={[poi.radius, 24, 24]} />
               <meshStandardMaterial
@@ -1016,14 +1014,14 @@ export default function Map3D({
             viewRotationZ={viewRotationZ}
           />
         ) : null}
+        {!lockCameraCenter ? (
         <OrbitControls
           makeDefault
           target={[0, 0, 0]}
-          enabled={!lockCameraCenter}
-          enableDamping={!lockCameraCenter}
-          enablePan={!lockCameraCenter}
-          enableRotate={!lockCameraCenter}
-          enableZoom={!lockCameraCenter}
+          enableDamping
+          enablePan
+          enableRotate
+          enableZoom
           screenSpacePanning
           panSpeed={0.9}
           rotateSpeed={0.6}
@@ -1038,6 +1036,7 @@ export default function Map3D({
             }
           }}
         />
+        ) : null}
         <MapCameraController
           mapWidth={width}
           mapHeight={height}

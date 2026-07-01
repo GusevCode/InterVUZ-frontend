@@ -282,6 +282,7 @@ export default function MapMultiFloorRouteView({
         : undefined
   );
   const lockCameraCenter = fullscreen;
+  const resolvedFillViewport = fullscreen && rotateInFullscreen;
   const currentRouteVisibleLabelIds = getVisibleRouteLabelIdsForFloor(graphRoute, current.floor);
 
   const mapPanel = (
@@ -300,6 +301,7 @@ export default function MapMultiFloorRouteView({
           : 0
       }
       lockCameraCenter={lockCameraCenter}
+      fillViewport={resolvedFillViewport}
     />
   );
 

@@ -584,8 +584,7 @@ export function getMobileLandscapeMapFrameSx(mapWidth, mapHeight) {
   };
 }
 
-export const FULLSCREEN_ROTATED_CAMERA_FIT = 0.72;
-export const FULLSCREEN_MAP_SCALE = 2;
-export const FULLSCREEN_FRAME_ROTATION_DEG = 180;
+export const FULLSCREEN_ROTATED_CAMERA_FIT = 2;
+export const FULLSCREEN_FRAME_ROTATION_DEG = 90;
 export const FULLSCREEN_MOBILE_VIEW_ROTATION_Z = Math.PI / 2;
 export const FULLSCREEN_VIEW_ROTATION_Z = -Math.PI / 2;

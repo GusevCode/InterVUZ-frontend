@@ -21,7 +21,6 @@ import MapLabelModeSwitcher from "../../components/MapLabelModeSwitcher";
 import MapMultiFloorRouteView from "../../components/MapMultiFloorRouteView";
 import FullscreenRotatedMapFrame, {
   FULLSCREEN_MAP_HEIGHT,
-  FULLSCREEN_MAP_SCALE,
   FULLSCREEN_MAP_WIDTH,
 } from "../../components/FullscreenRotatedMapFrame";
 import { getFloorFromMapId } from "../../entities/map/routeGraphLib";
@@ -625,6 +624,7 @@ function MapPageView({
                     cameraFitPadding={FULLSCREEN_ROTATED_CAMERA_FIT}
                     viewRotationZ={FULLSCREEN_MOBILE_VIEW_ROTATION_Z}
                     lockCameraCenter
+                    fillViewport
                   />
                 </FullscreenRotatedMapFrame>
               </Box>
@@ -645,8 +645,6 @@ function MapPageView({
                     height: FULLSCREEN_MAP_HEIGHT,
                     maxWidth: FULLSCREEN_MAP_WIDTH,
                     maxHeight: FULLSCREEN_MAP_HEIGHT,
-                    transform: `scale(${FULLSCREEN_MAP_SCALE})`,
-                    transformOrigin: "center center",
                   }}
                 >
                   <FloorMapCanvas
