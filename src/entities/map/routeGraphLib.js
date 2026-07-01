@@ -398,28 +398,146 @@ function findFloorPath(floorAdjacency, fromFloor, toFloor) {
   return { floors, connections };
 }
 
-function pickNodeOnFloor(connection, floor, graphData, preferTransfer = true) {
-  const candidates = connection.points.filter((point) => point.floor === floor);
-  if (candidates.length === 0) {
+function getConnectionNodeOnFloor(connection, floor) {
+  const point = connection.points.find((item) => item.floor === floor);
+  return point?.nodeId ?? null;
+}
+
+function connectionCoversFloors(connection, floors) {
+  return floors.every((floor) => connection.points.some((point) => point.floor === floor));
+}
+
+function getTransferNodesOnFloor(graphData) {
+  return (graphData.nodes ?? []).filter((node) => (
+    parseTransferNodeId(node.id) || isTransferNode(node)
+  ));
+}
+
+function findNearestTransferNode(graphData, fromNodeId) {
+  if (!fromNodeId || !graphData?.nodeMap.has(fromNodeId)) {
     return null;
   }
 
-  const nodes = candidates
-    .map((point) => graphData.nodeMap.get(point.nodeId))
-    .filter(Boolean);
+  const transferNodes = getTransferNodesOnFloor(graphData);
+  let best = null;
 
-  if (nodes.length === 0) {
-    return null;
-  }
-
-  if (preferTransfer) {
-    const transfer = nodes.find(isTransferNode);
-    if (transfer) {
-      return transfer.id;
+  transferNodes.forEach((node) => {
+    const { path, distance } = findShortestPath(graphData, fromNodeId, node.id);
+    if (path.length === 0 || !Number.isFinite(distance)) {
+      return;
     }
+
+    if (!best || distance < best.distance) {
+      best = { nodeId: node.id, distance, path };
+    }
+  });
+
+  return best;
+}
+
+function buildRouteSegmentsForConnection({
+  connection,
+  floors,
+  fromNodeId,
+  toNodeId,
+  floorGraphs,
+}) {
+  const legSegments = [];
+  let totalDistance = 0;
+
+  for (let index = 0; index < floors.length; index += 1) {
+    const floor = floors[index];
+    const floorGraph = floorGraphs.get(floor);
+    if (!floorGraph) {
+      return null;
+    }
+
+    const transferNodeId = getConnectionNodeOnFloor(connection, floor);
+    if (!transferNodeId || !floorGraph.graphData.nodeMap.has(transferNodeId)) {
+      return null;
+    }
+
+    const isFirst = index === 0;
+    const isLast = index === floors.length - 1;
+    let startNodeId;
+    let endNodeId;
+
+    if (isFirst) {
+      startNodeId = fromNodeId;
+      endNodeId = transferNodeId;
+    } else if (isLast) {
+      startNodeId = transferNodeId;
+      endNodeId = toNodeId;
+    } else {
+      startNodeId = transferNodeId;
+      endNodeId = transferNodeId;
+    }
+
+    if (startNodeId === endNodeId) {
+      const node = floorGraph.graphData.nodeMap.get(startNodeId);
+      legSegments.push({
+        floor,
+        graphId: floorGraph.graphId,
+        path: [startNodeId],
+        distance: 0,
+        points: node
+          ? [{ x: Number(node.x) || 0, y: Number(node.y) || 0 }]
+          : [],
+      });
+      continue;
+    }
+
+    const segment = segmentRoute(floorGraph.graphData, startNodeId, endNodeId);
+    if (!segment) {
+      return null;
+    }
+
+    totalDistance += segment.distance;
+    legSegments.push({
+      floor,
+      graphId: floorGraph.graphId,
+      ...segment,
+    });
   }
 
-  return nodes[0].id;
+  return { legSegments, totalDistance };
+}
+
+function pickBestTransferConnection({
+  floors,
+  fromNodeId,
+  toNodeId,
+  floorGraphs,
+  connections,
+}) {
+  let best = null;
+
+  connections.forEach((connection) => {
+    if (!connectionCoversFloors(connection, floors)) {
+      return;
+    }
+
+    const route = buildRouteSegmentsForConnection({
+      connection,
+      floors,
+      fromNodeId,
+      toNodeId,
+      floorGraphs,
+    });
+
+    if (!route) {
+      return;
+    }
+
+    if (!best || route.totalDistance < best.totalDistance) {
+      best = {
+        connection,
+        ...route,
+      };
+    }
+  });
+
+  return best;
 }
 
 function segmentRoute(graphData, fromNodeId, toNodeId) {
@@ -466,14 +584,20 @@ export function buildMultiFloorRoute({
       return null;
     }
     return {
+      fromNodeId,
+      toNodeId,
+      fromFloor,
+      toFloor,
       segments: [
         {
           floor: fromFloor,
           graphId: fromGraph.graphId,
+          path: segment.path,
           points: segment.points,
           label: `Этаж ${fromFloor}`,
         },
       ],
+      transferNodes: collectTransferNodesOnPath(segment.path, fromFloor, fromGraph.graphData),
       totalDistance: segment.distance,
     };
   }
@@ -486,63 +610,182 @@ export function buildMultiFloorRoute({
     return null;
   }
 
-  const { floors, connections: pathConnections } = floorPathResult;
-  const segments = [];
-  let totalDistance = 0;
+  const { floors } = floorPathResult;
+  const bestRoute = pickBestTransferConnection({
+    floors,
+    fromNodeId,
+    toNodeId,
+    floorGraphs,
+    connections,
+  });
 
-  for (let index = 0; index < floors.length; index += 1) {
-    const floor = floors[index];
-    const floorGraph = floorGraphs.get(floor);
-    if (!floorGraph) {
-      return null;
-    }
-
-    const isFirst = index === 0;
-    const isLast = index === floors.length - 1;
-    let startNodeId;
-    let endNodeId;
-    let transferHint;
-
-    if (isFirst) {
-      startNodeId = fromNodeId;
-      const connection = pathConnections[0];
-      endNodeId = pickNodeOnFloor(connection, floor, floorGraph.graphData);
-      transferHint = connection?.label;
-    } else if (isLast) {
-      const connection = pathConnections[pathConnections.length - 1];
-      startNodeId = pickNodeOnFloor(connection, floor, floorGraph.graphData);
-      endNodeId = toNodeId;
-      if (index > 0) {
-        transferHint = `Поднимитесь / спуститесь: ${connection?.label ?? "переход"}`;
-      }
-    } else {
-      const enterConnection = pathConnections[index - 1];
-      const exitConnection = pathConnections[index];
-      startNodeId = pickNodeOnFloor(enterConnection, floor, floorGraph.graphData);
-      endNodeId = pickNodeOnFloor(exitConnection, floor, floorGraph.graphData);
-      transferHint = `Через ${enterConnection?.label ?? "переход"}`;
-    }
-
-    if (!startNodeId || !endNodeId) {
-      return null;
-    }
-
-    const segment = segmentRoute(floorGraph.graphData, startNodeId, endNodeId);
-    if (!segment) {
-      return null;
-    }
-
-    totalDistance += segment.distance;
-    segments.push({
-      floor,
-      graphId: floorGraph.graphId,
-      points: segment.points,
-      label: `Этаж ${floor}`,
-      transferHint: isLast ? undefined : transferHint,
-    });
+  if (!bestRoute) {
+    return null;
   }
 
-  return { segments, totalDistance };
+  const { connection, legSegments, totalDistance } = bestRoute;
+  const segments = legSegments.map((leg, index) => {
+    const isLast = index === legSegments.length - 1;
+    let transferHint;
+
+    if (!isLast) {
+      transferHint = connection.label;
+    } else if (legSegments.length > 1) {
+      transferHint = `Поднимитесь / спуститесь: ${connection.label ?? "переход"}`;
+    }
+
+    return {
+      floor: leg.floor,
+      graphId: leg.graphId,
+      path: leg.path,
+      points: leg.points,
+      label: `Этаж ${leg.floor}`,
+      transferHint: isLast ? undefined : transferHint,
+    };
+  });
+
+  return {
+    fromNodeId,
+    toNodeId,
+    fromFloor,
+    toFloor,
+    segments,
+    transferNodes: floors
+      .map((floor) => ({
+        floor,
+        nodeId: getConnectionNodeOnFloor(connection, floor),
+      }))
+      .filter((item) => item.nodeId),
+    totalDistance,
+  };
+}
+
+export function collectTransferNodesOnPath(path, floor, graphData) {
+  return (path ?? [])
+    .filter((nodeId) => {
+      if (parseTransferNodeId(nodeId)) {
+        return true;
+      }
+      const node = graphData?.nodeMap?.get(nodeId);
+      return node && isTransferNode(node);
+    })
+    .map((nodeId) => ({ floor, nodeId }));
+}
+
+export function getVisibleRouteLabelIdsForFloor(routeContext, floor) {
+  if (!routeContext) {
+    return null;
+  }
+
+  const ids = new Set();
+  const normalizedFloor = Number(floor);
+
+  function addRoomNode(nodeId) {
+    if (!nodeId) {
+      return;
+    }
+    const elementId = getElementIdForRouteNode(nodeId);
+    if (elementId) {
+      ids.add(elementId);
+    }
+  }
+
+  function addTransferNode(nodeId) {
+    if (!nodeId) {
+      return;
+    }
+    ids.add(String(nodeId));
+  }
+
+  if (Number(routeContext.fromFloor) === normalizedFloor) {
+    addRoomNode(routeContext.fromNodeId);
+  }
+  if (Number(routeContext.toFloor) === normalizedFloor) {
+    addRoomNode(routeContext.toNodeId);
+  }
+
+  (routeContext.transferNodes ?? []).forEach((item) => {
+    if (Number(item.floor) === normalizedFloor) {
+      addTransferNode(item.nodeId);
+    }
+  });
+
+  return ids;
+}
+
+const TRANSFER_NODE_PREFIXES = {
+  s: "Лестница",
+  l: "Лифт",
+};
+
+export function parseTransferNodeId(nodeId) {
+  const match = String(nodeId).match(/^n_c_([a-z]+)(\d+)_(\d{3})$/i);
+  if (!match) {
+    return null;
+  }
+
+  const [, prefix, floor, seq] = match;
+  const normalizedPrefix = prefix.toLowerCase();
+  if (!TRANSFER_NODE_PREFIXES[normalizedPrefix]) {
+    return null;
+  }
+
+  return {
+    prefix: normalizedPrefix,
+    floor: Number(floor),
+    seq,
+    nodeId: String(nodeId),
+    label: TRANSFER_NODE_PREFIXES[normalizedPrefix],
+  };
+}
+
+export function buildFloorLinksFromGraphs(mapGraphs, floors = [2, 3]) {
+  const allowedFloors = new Set(floors.map(Number));
+  const grouped = new Map();
+
+  (mapGraphs ?? []).forEach((graph) => {
+    const floor = getFloorFromMapId(graph.id);
+    if (!allowedFloors.has(floor)) {
+      return;
+    }
+
+    (graph.nodes ?? []).forEach((node) => {
+      const parsed = parseTransferNodeId(node.id);
+      if (!parsed || !allowedFloors.has(parsed.floor)) {
+        return;
+      }
+
+      const key = `${parsed.prefix}_${parsed.seq}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {});
+      }
+      grouped.get(key)[parsed.floor] = parsed.nodeId;
+    });
+  });
+
+  const sortedFloors = [...allowedFloors].sort((left, right) => left - right);
+  const connections = [];
+
+  grouped.forEach((floorNodes, key) => {
+    const [prefix, seq] = key.split("_");
+    const points = sortedFloors
+      .filter((floor) => floorNodes[floor])
+      .map((floor) => ({ floor, nodeId: floorNodes[floor] }));
+
+    if (points.length < 2) {
+      return;
+    }
+
+    connections.push({
+      id: `${prefix}-${seq}`,
+      label: TRANSFER_NODE_PREFIXES[prefix] ?? "Переход",
+      points,
+    });
+  });
+
+  return connections.sort((left, right) =>
+    left.id.localeCompare(right.id, "ru", { numeric: true }),
+  );
 }
 
 export function getGraphForFloor(mapGraphs, floor) {

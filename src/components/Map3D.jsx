@@ -1,8 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, OrbitControls } from "@react-three/drei";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import * as THREE from "three";
+import { formatPoiDisplayLabel } from "../entities/map/mapLib";
+import {
+  buildRoomLabelGroups,
+  DEFAULT_LABEL_DISPLAY_MODE,
+  isAlwaysVisiblePoiType,
+  isAuditoriumTitle,
+  LABEL_DISPLAY_MODE,
+} from "../entities/map/roomLabelGroups";
+import { parseTransferNodeId } from "../entities/map/routeGraphLib";
 
 const MAP_PALETTE = {
   base: "#e7dfd3",
@@ -13,8 +22,10 @@ const MAP_PALETTE = {
   poi: "#f59e0b",
   hover: "#f59e0b",
   selected: "#22c55e",
-  label: "rgba(47, 36, 26, 0.78)",
-  labelElevated: "rgba(47, 36, 26, 0.9)",
+  label: "rgba(47, 36, 26, 0.16)",
+  labelElevated: "rgba(47, 36, 26, 0.26)",
+  poiLabel: "rgba(47, 36, 26, 0.08)",
+  poiLabelElevated: "rgba(47, 36, 26, 0.14)",
 };
 
 const POI_COLORS = {
@@ -110,22 +121,226 @@ function isRoomElement(element) {
   return /^room-/i.test(id) && !/^room-line-/i.test(id);
 }
 
-function CameraRig({ width, height }) {
-  const { camera, size } = useThree();
+function MapCanvasResizeBridge({ onResize }) {
+  const gl = useThree((state) => state.gl);
+  const setSize = useThree((state) => state.setSize);
+  const invalidate = useThree((state) => state.invalidate);
+  const scene = useThree((state) => state.scene);
+  const camera = useThree((state) => state.camera);
+  const lastSizeRef = useRef({ width: 0, height: 0 });
+  if (typeof window !== "undefined") {
+    window.__mapDebug = { scene, camera };
+  }
 
   useEffect(() => {
-    const aspect = size.width / size.height;
-    const fovRad = camera.fov * (Math.PI / 180);
-    const fitDist = Math.max(
-      (height / 2) / Math.tan(fovRad / 2),
-      (width / 2) / Math.tan(fovRad / 2) / aspect,
-    );
+    const syncSize = () => {
+      const parent = gl.domElement.parentElement;
+      if (!parent) {
+        return;
+      }
 
-    camera.up.set(0, 0, 1);
-    camera.position.set(0, 0, fitDist * 1.05);
-    camera.lookAt(0, 0, 0);
-    camera.updateProjectionMatrix();
-  }, [camera, width, height, size]);
+      const width = Math.max(1, parent.clientWidth || parent.offsetWidth);
+      const height = Math.max(1, parent.clientHeight || parent.offsetHeight);
+      const last = lastSizeRef.current;
+      if (last.width === width && last.height === height) {
+        return;
+      }
+      lastSizeRef.current = { width, height };
+
+      setSize(width, height);
+      gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      invalidate();
+      if (typeof onResize === "function") {
+        onResize({ width, height });
+      }
+    };
+
+    const syncAfterLayout = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(syncSize);
+      });
+    };
+
+    syncAfterLayout();
+    const observer = new ResizeObserver(syncAfterLayout);
+    const parent = gl.domElement.parentElement;
+    if (parent) {
+      observer.observe(parent);
+    }
+    window.addEventListener("resize", syncAfterLayout);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", syncAfterLayout);
+    };
+  }, [gl, invalidate, onResize, setSize]);
+
+  return null;
+}
+
+function MapRouteProjectionDriver({
+  routePoints,
+  polylineRef,
+  baseDepth,
+  mapMinX,
+  mapMinY,
+  mapWidth,
+  mapHeight,
+  viewRotationZ = 0,
+}) {
+  const { camera, size } = useThree();
+  const groupOffsetX = -(mapMinX + mapWidth / 2);
+  const groupOffsetY = mapMinY + mapHeight / 2;
+  const routeZ = baseDepth + 2;
+  const vector = useMemo(() => new THREE.Vector3(), []);
+  const rotationAxis = useMemo(() => new THREE.Vector3(0, 0, 1), []);
+  const hasViewRotation = Math.abs(viewRotationZ) > 0.001;
+
+  useFrame(() => {
+    const polyline = polylineRef.current;
+    if (!polyline) {
+      return;
+    }
+
+    if (!Array.isArray(routePoints) || routePoints.length < 2) {
+      polyline.setAttribute("points", "");
+      return;
+    }
+
+    const projected = routePoints.map((point) => {
+      vector.set(
+        point.x + groupOffsetX,
+        -point.y + groupOffsetY,
+        routeZ,
+      );
+      if (hasViewRotation) {
+        vector.applyAxisAngle(rotationAxis, viewRotationZ);
+      }
+      vector.project(camera);
+      const x = (vector.x * 0.5 + 0.5) * size.width;
+      const y = (-vector.y * 0.5 + 0.5) * size.height;
+      return `${x},${y}`;
+    });
+
+    polyline.setAttribute("points", projected.join(" "));
+  });
+
+  return null;
+}
+
+function resetOrbitCamera({ camera, controls, fitDist }) {
+  camera.up.set(0, 0, 1);
+  camera.position.set(0, 0, fitDist);
+  camera.lookAt(0, 0, 0);
+
+  if (controls) {
+    controls.target.set(0, 0, 0);
+    controls.update();
+    if (typeof controls.saveState === "function") {
+      controls.saveState();
+    }
+  }
+}
+
+function MapCameraController({
+  mapWidth,
+  mapHeight,
+  fitPadding = 1.04,
+  viewRotationZ = 0,
+  lockCameraCenter = false,
+  fillViewport = false,
+}) {
+  const { camera, size, controls } = useThree();
+  const mapSizeRef = useRef({ width: 0, height: 0 });
+  const viewportRef = useRef({ width: 0, height: 0 });
+  const initializedRef = useRef(false);
+  const lastFitDistRef = useRef(0);
+
+  useEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera)) {
+      return;
+    }
+
+    if (size.width < 2 || size.height < 2) {
+      return;
+    }
+
+    const viewportWidth = Math.round(size.width);
+    const viewportHeight = Math.round(size.height);
+    const mapChanged =
+      mapSizeRef.current.width !== mapWidth ||
+      mapSizeRef.current.height !== mapHeight;
+    const viewportChanged =
+      Math.abs(viewportRef.current.width - viewportWidth) > 4 ||
+      Math.abs(viewportRef.current.height - viewportHeight) > 4;
+
+    if (!mapChanged && !viewportChanged) {
+      return;
+    }
+
+    const viewAspect = size.width / Math.max(1, size.height);
+    const fovRad = camera.fov * (Math.PI / 180);
+    const halfTan = Math.tan(fovRad / 2);
+    const hasViewRotation = Math.abs(viewRotationZ) > 0.001;
+    const fitWidth = hasViewRotation ? mapHeight : mapWidth;
+    const fitHeight = hasViewRotation ? mapWidth : mapHeight;
+    const fitHeightDist = fitHeight / (2 * halfTan);
+    const fitWidthDist = fitWidth / (2 * halfTan * viewAspect);
+    const fitDist = (fillViewport ? Math.min : Math.max)(fitHeightDist, fitWidthDist) * fitPadding;
+
+    const shouldResetTarget = mapChanged || !initializedRef.current;
+
+    if (lockCameraCenter) {
+      if (!mapChanged && initializedRef.current) {
+        return;
+      }
+      camera.aspect = viewAspect;
+      camera.updateProjectionMatrix();
+      // Always fully reset (never rescale from a prior position) so the
+      // locked view can never drift away from dead-center, regardless of
+      // resize events.
+      resetOrbitCamera({ camera, controls, fitDist });
+      initializedRef.current = true;
+      lastFitDistRef.current = fitDist;
+    } else if (shouldResetTarget) {
+      resetOrbitCamera({ camera, controls, fitDist });
+      initializedRef.current = true;
+      lastFitDistRef.current = fitDist;
+    } else {
+      // Viewport resized (e.g. mobile address bar collapsing, or the
+      // container settling into its final layout after mount). Rescale the
+      // current camera distance by how much the fit distance changed instead
+      // of snapping back to the default view, so any zoom/rotate the user
+      // already applied is preserved. When nothing has changed camera-side
+      // yet, this rescale is equivalent to a full re-fit.
+      camera.aspect = viewAspect;
+      camera.updateProjectionMatrix();
+
+      const prevFitDist = lastFitDistRef.current;
+      if (controls && prevFitDist > 0.001) {
+        const scale = fitDist / prevFitDist;
+        const offset = camera.position.clone().sub(controls.target);
+        offset.multiplyScalar(scale);
+        camera.position.copy(controls.target).add(offset);
+        controls.update();
+      }
+      lastFitDistRef.current = fitDist;
+    }
+
+    mapSizeRef.current = { width: mapWidth, height: mapHeight };
+    viewportRef.current = { width: viewportWidth, height: viewportHeight };
+  }, [
+    camera,
+    controls,
+    fitPadding,
+    fillViewport,
+    lockCameraCenter,
+    mapHeight,
+    mapWidth,
+    size.height,
+    size.width,
+    viewRotationZ,
+  ]);
 
   return null;
 }
@@ -135,11 +350,19 @@ export default function Map3D({
   selectedId,
   targetId = "",
   onSelect,
-  showLabels = true,
+  labelDisplayMode = DEFAULT_LABEL_DISPLAY_MODE,
   onInteract,
   routePoints = [],
+  routeVisibleLabelIds = null,
+  cameraFitPadding = 1.04,
+  viewRotationZ = 0,
+  labelCssRotation = 0,
+  lockCameraCenter = false,
+  fillViewport = false,
 }) {
   const [hoveredId, setHoveredId] = useState(null);
+  const routePolylineRef = useRef(null);
+  const labelsLayerRef = useRef(null);
   const allElements = useMemo(
     () => (mapVector?.elements ?? []).filter((element) => element?.d),
     [mapVector],
@@ -323,16 +546,7 @@ export default function Map3D({
     })
   ), [shapes, roomDepth]);
 
-  const routeGeometry = useMemo(() => {
-    if (!Array.isArray(routePoints) || routePoints.length < 2) {
-      return null;
-    }
-    const routeZ = baseDepth + 2;
-    const pathPoints = routePoints.map((point) => new THREE.Vector3(point.x, point.y, routeZ));
-    const curve = new THREE.CatmullRomCurve3(pathPoints, false, "centripetal");
-    const segments = Math.max(16, pathPoints.length * 6);
-    return new THREE.TubeGeometry(curve, segments, 1.5, 12, false);
-  }, [routePoints, baseDepth]);
+  const hasRoute = Array.isArray(routePoints) && routePoints.length >= 2;
 
   const poiMarkers = useMemo(() => (
     sourcePois.map((poi) => ({
@@ -340,7 +554,7 @@ export default function Map3D({
       radius: 4.5,
       z: baseDepth + 4.5,
       color: getPoiColor(poi.type),
-      label: poi.title || poi.id,
+      label: formatPoiDisplayLabel(poi.title || poi.id),
     }))
   ), [sourcePois, baseDepth]);
 
@@ -350,8 +564,8 @@ export default function Map3D({
       ...wallStrokeMeshes,
       ...strokeMeshes,
       ...outlineMeshes,
-    ].concat(routeGeometry ? [{ geometry: routeGeometry }] : []),
-    [fillMeshes, wallStrokeMeshes, strokeMeshes, outlineMeshes, routeGeometry],
+    ],
+    [fillMeshes, wallStrokeMeshes, strokeMeshes, outlineMeshes],
   );
 
   const labelItems = useMemo(() => (
@@ -362,7 +576,8 @@ export default function Map3D({
         return [];
       }
       const rawLabel = element?.title || element?.label || id;
-      const label = typeof rawLabel === "string" ? rawLabel.replace(/^room-?/i, "") : rawLabel;
+      const normalizedLabel = typeof rawLabel === "string" ? rawLabel.replace(/^room-?/i, "") : rawLabel;
+      const label = formatPoiDisplayLabel(normalizedLabel);
       if (!label) {
         return [];
       }
@@ -393,10 +608,13 @@ export default function Map3D({
         { x: 0, y: 0 },
       );
       const count = points.length;
+      const roomId = String(id ?? "");
       return [{
         key: `l-${item.key}`,
         id,
         label,
+        isAuditorium: isAuditoriumTitle(rawLabel)
+          || (/^room-/i.test(roomId) && !/^room-line-/i.test(roomId)),
         x: centroid.x / count,
         y: centroid.y / count,
         z: roomDepth + 8,
@@ -407,46 +625,99 @@ export default function Map3D({
     })
   ), [shapes, roomDepth]);
 
-  const visibleLabels = useMemo(() => {
+  const auditoriumLabels = useMemo(() => {
+    const fromShapes = labelItems.filter((item) => item.isAuditorium);
+    const shapeIds = new Set(fromShapes.map((item) => item.id));
+    const fromPois = poiMarkers
+      .filter((poi) => !isAlwaysVisiblePoiType(poi.type))
+      .filter((poi) => !shapeIds.has(poi.id))
+      .map((poi) => ({
+        key: `aud-poi-${poi.id}`,
+        id: poi.id,
+        label: poi.label,
+        x: poi.x,
+        y: poi.y,
+        z: poi.z + poi.radius + 1.8,
+        isAuditorium: true,
+        width: poi.radius * 4,
+        height: poi.radius * 4,
+      }));
+
+    return [...fromShapes, ...fromPois];
+  }, [labelItems, poiMarkers]);
+
+  const staticRoomLabels = useMemo(
+    () => labelItems.filter((item) => !item.isAuditorium),
+    [labelItems],
+  );
+
+  const roomLabelGroups = useMemo(
+    () => buildRoomLabelGroups(auditoriumLabels, width, height),
+    [auditoriumLabels, width, height],
+  );
+
+  const visibleAuditoriumLabels = useMemo(() => {
     const selectedSet = new Set([selectedId, hoveredId].filter(Boolean));
-    const sorted = [...labelItems]
+    let pool = auditoriumLabels;
+
+    if (labelDisplayMode === LABEL_DISPLAY_MODE.GROUP_1) {
+      pool = auditoriumLabels.filter((item) => roomLabelGroups.get(item.id) === 0);
+    } else if (labelDisplayMode === LABEL_DISPLAY_MODE.GROUP_2) {
+      pool = auditoriumLabels.filter((item) => roomLabelGroups.get(item.id) === 1);
+    } else if (labelDisplayMode === LABEL_DISPLAY_MODE.GROUP_3) {
+      pool = auditoriumLabels.filter((item) => roomLabelGroups.get(item.id) === 2);
+    }
+
+    if (routeVisibleLabelIds) {
+      pool = pool.filter((item) => (
+        routeVisibleLabelIds.has(item.id)
+        || selectedSet.has(item.id)
+      ));
+    }
+
+    const visible = pool
       .filter((item) => !selectedSet.has(item.id))
-      .sort((left, right) => (right.area || 0) - (left.area || 0));
-    const accepted = [];
-    const minDistance = Math.max(width, height) * 0.035;
+      .map((item) => ({ ...item }));
 
-    sorted.forEach((candidate) => {
-      const maxSize = Math.max(candidate.width || 0, candidate.height || 0);
-      const threshold = Math.max(minDistance, maxSize * 0.5);
-      const overlaps = accepted.some((item) => {
-        const dx = item.x - candidate.x;
-        const dy = item.y - candidate.y;
-        return Math.hypot(dx, dy) < threshold;
-      });
-      if (!overlaps) {
-        accepted.push(candidate);
+    auditoriumLabels.forEach((item) => {
+      if (selectedSet.has(item.id) && (!routeVisibleLabelIds || routeVisibleLabelIds.has(item.id))) {
+        visible.push({ ...item, z: roomDepth + 14, elevated: true });
       }
     });
 
-    labelItems.forEach((item) => {
-      if (selectedSet.has(item.id)) {
-        accepted.push({ ...item, z: roomDepth + 14, elevated: true });
-      }
-    });
+    return visible;
+  }, [auditoriumLabels, selectedId, hoveredId, roomDepth, labelDisplayMode, roomLabelGroups, routeVisibleLabelIds]);
 
-    return accepted;
-  }, [labelItems, selectedId, hoveredId, width, height, roomDepth]);
+  const visibleLabels = useMemo(
+    () => [...staticRoomLabels, ...visibleAuditoriumLabels],
+    [staticRoomLabels, visibleAuditoriumLabels],
+  );
 
   const poiLabels = useMemo(() => (
-    poiMarkers.map((poi) => ({
-      key: `poi-label-${poi.id}`,
-      id: poi.id,
-      label: poi.label,
-      x: poi.x,
-      y: poi.y,
-      z: poi.z + poi.radius + 1.8,
-    }))
-  ), [poiMarkers]);
+    poiMarkers
+      .filter((poi) => {
+        if (!isAlwaysVisiblePoiType(poi.type)) {
+          return false;
+        }
+        if (!routeVisibleLabelIds) {
+          return true;
+        }
+        const isTransferPoi = poi.type === "stairs" || Boolean(parseTransferNodeId(poi.id));
+        if (!isTransferPoi) {
+          return true;
+        }
+        return routeVisibleLabelIds.has(poi.id);
+      })
+      .map((poi) => ({
+        key: `poi-label-${poi.id}`,
+        id: poi.id,
+        label: poi.label,
+        x: poi.x,
+        y: poi.y,
+        z: poi.z + poi.radius + 1.8,
+        isPoi: true,
+      }))
+  ), [poiMarkers, routeVisibleLabelIds]);
 
   const targetAnchor = useMemo(() => {
     if (!targetId) {
@@ -516,29 +787,46 @@ export default function Map3D({
   }
 
   return (
-    <Canvas
-      shadows
-      gl={{ alpha: true, antialias: true }}
-      camera={{ position: [0, 0, Math.max(width, height) * 0.6], near: 1, far: 10000 }}
-      style={{ width: "100%", height: "100%" }}
+    <div style={{
+      position: "absolute",
+      inset: 0,
+      width: "100%",
+      height: "100%",
+      overflow: "hidden",
+      touchAction: "none",
+      overscrollBehavior: "none",
+      pointerEvents: lockCameraCenter ? "none" : undefined,
+    }}
     >
-      <CameraRig width={width} height={height} />
-      <ambientLight intensity={0.6} />
-      <directionalLight
-        position={[0, 0, 600]}
-        intensity={0.85}
-        castShadow
-        shadow-bias={-0.0005}
-        shadow-normalBias={0.02}
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-near={1}
-        shadow-camera-far={Math.max(width, height) * 5}
-        shadow-camera-left={-shadowExtent}
-        shadow-camera-right={shadowExtent}
-        shadow-camera-top={shadowExtent}
-        shadow-camera-bottom={-shadowExtent}
-      />
-      <group position={[-(minX + width / 2), (minY + height / 2), 0]} scale={[1, -1, 1]}>
+      <Canvas
+        shadows
+        gl={{ alpha: true, antialias: true }}
+        camera={{ position: [0, 0, Math.max(width, height) * 0.6], near: 1, far: 10000 }}
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "block",
+          touchAction: "none",
+        }}
+      >
+        <MapCanvasResizeBridge />
+        <ambientLight intensity={0.6} />
+        <directionalLight
+          position={[0, 0, 600]}
+          intensity={0.85}
+          castShadow
+          shadow-bias={-0.0005}
+          shadow-normalBias={0.02}
+          shadow-mapSize={[2048, 2048]}
+          shadow-camera-near={1}
+          shadow-camera-far={Math.max(width, height) * 5}
+          shadow-camera-left={-shadowExtent}
+          shadow-camera-right={shadowExtent}
+          shadow-camera-top={shadowExtent}
+          shadow-camera-bottom={-shadowExtent}
+        />
+        <group rotation={[0, 0, viewRotationZ]}>
+        <group position={[-(minX + width / 2), (minY + height / 2), 0]} scale={[1, -1, 1]}>
         <mesh receiveShadow rotation={[0, 0, 0]} position={[0, 0, -2]}>
           <planeGeometry args={[width * 1.3, height * 1.3]} />
           <shadowMaterial opacity={0.25} />
@@ -653,17 +941,6 @@ export default function Map3D({
             </mesh>
           );
         })}
-        {routeGeometry ? (
-          <mesh geometry={routeGeometry} position={[0, 0, 0]}>
-            <meshStandardMaterial
-              color="#f97316"
-              emissive="#f97316"
-              emissiveIntensity={0.5}
-              metalness={0.2}
-              roughness={0.35}
-            />
-          </mesh>
-        ) : null}
         {targetAnchor ? (
           <>
             <mesh position={[targetAnchor.x, targetAnchor.y, targetAnchor.z]}>
@@ -688,49 +965,121 @@ export default function Map3D({
             </mesh>
           </>
         ) : null}
-        {showLabels ? [...visibleLabels, ...poiLabels].map((label) => (
+        {[...visibleLabels, ...poiLabels].map((label) => {
+          const labelTransform = [
+            labelCssRotation ? `rotate(${labelCssRotation}deg)` : "",
+            label.isPoi ? "translateY(-10px)" : "",
+          ].filter(Boolean).join(" ") || undefined;
+
+          return (
           <Html
             key={label.key}
             position={[label.x, label.y, label.z]}
             center
             transform={false}
             occlude={false}
+            portal={labelsLayerRef}
+            zIndexRange={hasRoute ? [200, 100] : [50, 0]}
             style={{ pointerEvents: "none" }}
           >
             <div
               style={{
                 padding: "2px 6px",
                 borderRadius: 6,
-                background: label.elevated ? MAP_PALETTE.labelElevated : MAP_PALETTE.label,
+                background: label.isPoi
+                  ? (label.elevated ? MAP_PALETTE.poiLabelElevated : MAP_PALETTE.poiLabel)
+                  : (label.elevated ? MAP_PALETTE.labelElevated : MAP_PALETTE.label),
                 color: "#ffffff",
                 fontSize: label.elevated ? 12 : 10,
                 fontWeight: label.elevated ? 700 : 600,
                 letterSpacing: 0.2,
                 whiteSpace: "nowrap",
+                transform: labelTransform,
               }}
             >
               {label.label}
             </div>
           </Html>
-        )) : null}
-      </group>
-      <OrbitControls
-        enableDamping
-        enablePan
-        screenSpacePanning
-        panSpeed={0.9}
-        rotateSpeed={0.6}
-        zoomSpeed={0.9}
-        minPolarAngle={0}
-        maxPolarAngle={Math.PI / 4}
-        minDistance={Math.max(width, height) * 0.1}
-        maxDistance={Math.max(width, height) * 3}
-        onStart={() => {
-          if (typeof onInteract === "function") {
-            onInteract();
-          }
+          );
+        })}
+        </group>
+        </group>
+        {hasRoute ? (
+          <MapRouteProjectionDriver
+            routePoints={routePoints}
+            polylineRef={routePolylineRef}
+            baseDepth={baseDepth}
+            mapMinX={minX}
+            mapMinY={minY}
+            mapWidth={width}
+            mapHeight={height}
+            viewRotationZ={viewRotationZ}
+          />
+        ) : null}
+        <OrbitControls
+          makeDefault
+          target={[0, 0, 0]}
+          enabled={!lockCameraCenter}
+          enableDamping={!lockCameraCenter}
+          enablePan={!lockCameraCenter}
+          enableRotate={!lockCameraCenter}
+          enableZoom={!lockCameraCenter}
+          screenSpacePanning
+          panSpeed={0.9}
+          rotateSpeed={0.6}
+          zoomSpeed={0.9}
+          minPolarAngle={0}
+          maxPolarAngle={Math.PI / 4}
+          minDistance={Math.max(width, height) * 0.1}
+          maxDistance={Math.max(width, height) * 3}
+          onStart={() => {
+            if (typeof onInteract === "function") {
+              onInteract();
+            }
+          }}
+        />
+        <MapCameraController
+          mapWidth={width}
+          mapHeight={height}
+          fitPadding={cameraFitPadding}
+          viewRotationZ={viewRotationZ}
+          lockCameraCenter={lockCameraCenter}
+          fillViewport={fillViewport}
+        />
+      </Canvas>
+      {hasRoute ? (
+        <svg
+          width="100%"
+          height="100%"
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            zIndex: 80,
+            overflow: "visible",
+          }}
+        >
+          <polyline
+            ref={routePolylineRef}
+            fill="none"
+            stroke="#f97316"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ filter: "drop-shadow(0 0 2px rgba(0,0,0,0.45))" }}
+          />
+        </svg>
+      ) : null}
+      <div
+        ref={labelsLayerRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 100,
+          pointerEvents: "none",
+          overflow: "visible",
         }}
       />
-    </Canvas>
+    </div>
   );
 }

@@ -1,29 +1,5 @@
 {
-  "version": 1,
-  "connections": [
-    {
-      "id": "stairs-main",
-      "label": "Лестница",
-      "points": [
-        { "floor": 1, "nodeId": "n_f1_010" },
-        { "floor": 3, "nodeId": "n_f3_020" },
-        { "floor": 3, "nodeId": "n_f3_021" }
-      ]
-    },
-    {
-      "id": "stairs-3-west",
-      "label": "Лестница (запад)",
-      "points": [
-        { "floor": 3, "nodeId": "n_f3_040" }
-      ]
-    },
-    {
-      "id": "elevator-3",
-      "label": "Лифт",
-      "points": [
-        { "floor": 3, "nodeId": "n_f3_009" },
-        { "floor": 3, "nodeId": "n_f3_045" }
-      ]
-    }
-  ]
+  "version": 2,
+  "description": "Auto-generated from graph nodes: stairs/elevators with matching suffix (s2_001 ↔ s3_001). Runtime uses buildFloorLinksFromGraphs().",
+  "connections": []
 }

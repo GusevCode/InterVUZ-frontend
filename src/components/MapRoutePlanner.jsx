@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -10,6 +10,7 @@ import RouteNodeAutocomplete from "../shared/ui/RouteNodeAutocomplete";
 import {
   buildGraph,
   buildMultiFloorRoute,
+  collectTransferNodesOnPath,
   filterSelectableRouteNodes,
   findShortestPath,
   getGraphForFloor,
@@ -33,10 +34,14 @@ export default function MapRoutePlanner({
   floorConnections = [],
   onSingleFloorRouteChange,
   onMultiFloorRouteChange,
+  onGraphRouteChange,
   onRouteFloorChange,
   activeFloor = null,
   selectedElementId = "",
+  routeLocked = false,
   dark = false,
+  compact = false,
+  landscape = false,
 }) {
   const routableFloors = useMemo(() => listRoutableFloors(mapGraphs), [mapGraphs]);
 
@@ -45,6 +50,7 @@ export default function MapRoutePlanner({
   const [fromNodeId, setFromNodeId] = useState("");
   const [toNodeId, setToNodeId] = useState("");
   const [error, setError] = useState("");
+  const prevSelectedRouteNodeIdRef = useRef("");
 
   const fromFloorData = routableFloors.find((item) => item.floor === fromFloor) ?? null;
   const toFloorData = routableFloors.find((item) => item.floor === toFloor) ?? null;
@@ -70,6 +76,39 @@ export default function MapRoutePlanner({
     || fromSelectableNodes.some((node) => /^ауд/i.test(String(node.label ?? "")));
   const nodePlaceholder = usesAuditoriumNodes ? "Номер аудитории, например 208" : "Начните вводить точку…";
 
+  function clearBuiltRoute() {
+    setError("");
+    if (typeof onSingleFloorRouteChange === "function") {
+      onSingleFloorRouteChange([]);
+    }
+    if (typeof onMultiFloorRouteChange === "function") {
+      onMultiFloorRouteChange(null);
+    }
+    if (typeof onGraphRouteChange === "function") {
+      onGraphRouteChange(null);
+    }
+  }
+
+  function handleFromFloorChange(nextFloor) {
+    clearBuiltRoute();
+    setFromFloor(nextFloor);
+  }
+
+  function handleToFloorChange(nextFloor) {
+    clearBuiltRoute();
+    setToFloor(nextFloor);
+  }
+
+  function handleFromNodeChange(nextNodeId) {
+    clearBuiltRoute();
+    setFromNodeId(nextNodeId);
+  }
+
+  function handleToNodeChange(nextNodeId) {
+    clearBuiltRoute();
+    setToNodeId(nextNodeId);
+  }
+
   useEffect(() => {
     if (routableFloors.length === 0) {
       setFromFloor(null);
@@ -82,6 +121,13 @@ export default function MapRoutePlanner({
       if (typeof onMultiFloorRouteChange === "function") {
         onMultiFloorRouteChange(null);
       }
+      if (typeof onGraphRouteChange === "function") {
+        onGraphRouteChange(null);
+      }
+      return;
+    }
+
+    if (routeLocked) {
       return;
     }
 
@@ -93,16 +139,10 @@ export default function MapRoutePlanner({
     setFromFloor(nextFromFloor);
     setToFloor(nextToFloor);
     setError("");
-    if (typeof onSingleFloorRouteChange === "function") {
-      onSingleFloorRouteChange([]);
-    }
-    if (typeof onMultiFloorRouteChange === "function") {
-      onMultiFloorRouteChange(null);
-    }
-  }, [routableFloors, activeFloor, onSingleFloorRouteChange, onMultiFloorRouteChange]);
+  }, [routableFloors, activeFloor, routeLocked]);
 
   useEffect(() => {
-    if (!Number.isFinite(Number(activeFloor))) {
+    if (routeLocked || !Number.isFinite(Number(activeFloor))) {
       return;
     }
 
@@ -112,7 +152,7 @@ export default function MapRoutePlanner({
     }
 
     setFromFloor(nextFloor);
-  }, [activeFloor, routableFloors]);
+  }, [activeFloor, routableFloors, routeLocked]);
 
   useEffect(() => {
     if (!fromFloorData) {
@@ -135,8 +175,14 @@ export default function MapRoutePlanner({
   // so its label is substituted into the route's source autocomplete input.
   useEffect(() => {
     if (!selectedRouteNodeId) {
+      prevSelectedRouteNodeIdRef.current = "";
       return;
     }
+    if (selectedRouteNodeId === prevSelectedRouteNodeIdRef.current) {
+      return;
+    }
+    prevSelectedRouteNodeIdRef.current = selectedRouteNodeId;
+    clearBuiltRoute();
     setFromNodeId(selectedRouteNodeId);
     if (Number.isFinite(Number(activeFloor))) {
       setFromFloor(Number(activeFloor));
@@ -172,6 +218,9 @@ export default function MapRoutePlanner({
         if (typeof onMultiFloorRouteChange === "function") {
           onMultiFloorRouteChange(null);
         }
+        if (typeof onGraphRouteChange === "function") {
+          onGraphRouteChange(null);
+        }
         return;
       }
 
@@ -183,6 +232,22 @@ export default function MapRoutePlanner({
       }
       if (typeof onMultiFloorRouteChange === "function") {
         onMultiFloorRouteChange(null);
+      }
+      if (typeof onGraphRouteChange === "function") {
+        onGraphRouteChange({
+          fromNodeId,
+          toNodeId,
+          fromFloor,
+          toFloor,
+          segments: [{
+            floor: fromFloor,
+            graphId: fromFloorData?.graphId ?? graph.id,
+            path,
+            points: pathToPoints(graphData, path),
+            label: `Этаж ${fromFloor}`,
+          }],
+          transferNodes: collectTransferNodesOnPath(path, fromFloor, graphData),
+        });
       }
       return;
     }
@@ -206,6 +271,9 @@ export default function MapRoutePlanner({
       if (typeof onMultiFloorRouteChange === "function") {
         onMultiFloorRouteChange(null);
       }
+      if (typeof onGraphRouteChange === "function") {
+        onGraphRouteChange(null);
+      }
       return;
     }
 
@@ -214,6 +282,9 @@ export default function MapRoutePlanner({
     }
     if (typeof onMultiFloorRouteChange === "function") {
       onMultiFloorRouteChange(result);
+    }
+    if (typeof onGraphRouteChange === "function") {
+      onGraphRouteChange(result);
     }
   }
 
@@ -239,62 +310,24 @@ export default function MapRoutePlanner({
     : {};
 
   return (
-    <Stack spacing={1.5}>
-      <Typography
-        variant="subtitle2"
-        sx={
-          dark
-            ? {
-                color: D.labelColor,
-                fontFamily: "'Manrope', sans-serif",
-                fontWeight: 700,
-                letterSpacing: "0.5px",
-                textTransform: "uppercase",
-                fontSize: "13px",
-              }
-            : {}
-        }
-      >
-        {usesAuditoriumNodes ? "Маршрут между аудиториями" : "Маршрут по разметке"}
-      </Typography>
-
-      {selectedRouteNodeId ? (
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Typography variant="caption" color="text.secondary" sx={dark ? { color: D.labelColor } : {}}>
-            Аудитория с карты подставлена в «Откуда»
-          </Typography>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => {
-              setToNodeId(selectedRouteNodeId);
-              if (Number.isFinite(Number(activeFloor))) {
-                setToFloor(Number(activeFloor));
-              }
-            }}
-            sx={dark ? { color: D.btnText, borderColor: D.btnBorder } : {}}
-          >
-            Сделать «Куда»
-          </Button>
-        </Stack>
-      ) : null}
-
-      <Box>
+    <Stack spacing={landscape ? 0.75 : compact ? 1 : 1.5} sx={landscape ? { minWidth: 220, width: "100%" } : undefined}>
+      <Stack direction={landscape ? "row" : "column"} spacing={landscape ? 1 : 0} sx={landscape ? { alignItems: "flex-start" } : undefined}>
+      <Box sx={landscape ? { minWidth: 150 } : undefined}>
         <Typography
           variant="caption"
           color="text.secondary"
-          sx={{ display: "block", mb: 1.25, ...(dark ? { color: D.labelColor } : {}) }}
+          sx={{ display: "block", mb: landscape ? 0.5 : 1.25, ...(dark ? { color: D.labelColor } : {}) }}
         >
           Откуда
         </Typography>
-        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+        <Stack direction={landscape ? "column" : compact ? "column" : "row"} spacing={1} sx={{ mt: landscape ? 0 : 0.5 }}>
           <TextField
             select
             size="small"
             label="Этаж"
             value={fromFloor ?? ""}
-            onChange={(event) => setFromFloor(Number(event.target.value))}
-            sx={{ ...inputSx, minWidth: 88 }}
+            onChange={(event) => handleFromFloorChange(Number(event.target.value))}
+            sx={{ ...inputSx, minWidth: compact ? 0 : 88, width: compact ? "100%" : undefined }}
           >
             {routableFloors.map((item) => (
               <MenuItem key={`from-floor-${item.floor}`} value={item.floor}>
@@ -305,7 +338,7 @@ export default function MapRoutePlanner({
           <RouteNodeAutocomplete
             nodes={fromSelectableNodes}
             value={fromNodeId}
-            onChange={setFromNodeId}
+            onChange={handleFromNodeChange}
             placeholder={nodePlaceholder}
             inputSx={{ ...inputSx, flex: 1 }}
             sx={{ flex: 1 }}
@@ -313,22 +346,22 @@ export default function MapRoutePlanner({
         </Stack>
       </Box>
 
-      <Box>
+      <Box sx={landscape ? { minWidth: 150 } : undefined}>
         <Typography
           variant="caption"
           color="text.secondary"
-          sx={{ display: "block", mb: 1.25, ...(dark ? { color: D.labelColor } : {}) }}
+          sx={{ display: "block", mb: landscape ? 0.5 : 1.25, ...(dark ? { color: D.labelColor } : {}) }}
         >
           Куда
         </Typography>
-        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+        <Stack direction={landscape ? "column" : compact ? "column" : "row"} spacing={1} sx={{ mt: landscape ? 0 : 0.5 }}>
           <TextField
             select
             size="small"
             label="Этаж"
             value={toFloor ?? ""}
-            onChange={(event) => setToFloor(Number(event.target.value))}
-            sx={{ ...inputSx, minWidth: 88 }}
+            onChange={(event) => handleToFloorChange(Number(event.target.value))}
+            sx={{ ...inputSx, minWidth: compact ? 0 : 88, width: compact ? "100%" : undefined }}
           >
             {routableFloors.map((item) => (
               <MenuItem key={`to-floor-${item.floor}`} value={item.floor}>
@@ -339,13 +372,14 @@ export default function MapRoutePlanner({
           <RouteNodeAutocomplete
             nodes={toSelectableNodes}
             value={toNodeId}
-            onChange={setToNodeId}
+            onChange={handleToNodeChange}
             placeholder={nodePlaceholder}
             inputSx={{ ...inputSx, flex: 1 }}
             sx={{ flex: 1 }}
           />
         </Stack>
       </Box>
+      </Stack>
 
       <Button
         variant="outlined"
@@ -358,9 +392,12 @@ export default function MapRoutePlanner({
                 color: D.btnText,
                 fontFamily: "'Manrope', sans-serif",
                 fontWeight: 700,
-                fontSize: "14px",
+                fontSize: landscape ? "11px" : compact ? "12px" : "14px",
                 borderRadius: "12px",
-                height: "40px",
+                height: landscape ? "34px" : compact ? "36px" : "40px",
+                px: landscape ? 1.25 : compact ? 1 : 2,
+                alignSelf: landscape ? "flex-start" : undefined,
+                whiteSpace: "nowrap",
                 "&:hover": { background: "rgba(28, 48, 82, 0.9)", borderColor: "#4d75b0" },
               }
             : {}

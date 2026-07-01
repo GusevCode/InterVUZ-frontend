@@ -1,5 +1,5 @@
 import { fetchJson, postJson } from "../../shared/baseApi";
-import { getFloorFromMapId } from "./routeGraphLib";
+import { buildFloorLinksFromGraphs, getFloorFromMapId } from "./routeGraphLib";
 
 const localMapModules = import.meta.glob("./assets/*.{png,jpg,jpeg,webp,avif,gif,svg}", {
   eager: true,
@@ -23,6 +23,18 @@ let cachedMapVectorPromise = null;
 let cachedMapVectorsPromise = null;
 let cachedMapGraphsPromise = null;
 let cachedPlacesPromise = null;
+
+export const ACTIVE_MAP_FLOORS = [2, 3];
+export const DEFAULT_MAP_FLOOR = 2;
+
+export function isActiveMapFloor(floorNumber) {
+  return ACTIVE_MAP_FLOORS.includes(Number(floorNumber));
+}
+
+function isActiveMapAssetPath(filePath = "") {
+  const floorNumber = getFloorFromMapId(filePath);
+  return floorNumber === null || isActiveMapFloor(floorNumber);
+}
 
 function readImageSizeFromSrc(src) {
   return new Promise((resolve, reject) => {
@@ -101,14 +113,20 @@ function compareFloors(left, right) {
 }
 
 function getLocalMapSource() {
-  const entries = Object.entries(localMapModules).sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"));
+  const entries = Object.entries(localMapModules)
+    .sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"))
+    .filter(([filePath]) => isActiveMapAssetPath(filePath));
   const svgEntry = entries.find(([filePath]) => filePath.toLowerCase().endsWith(".svg"));
   return svgEntry ?? entries[0] ?? null;
 }
 
 function getLocalMapVectorSource() {
-  const entries = Object.entries(localMapVectorModules).sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"));
-  return entries[0] ?? null;
+  const entries = Object.entries(localMapVectorModules)
+    .sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"))
+    .filter(([filePath]) => isActiveMapAssetPath(filePath));
+  return entries.find(([filePath]) => getFloorFromMapId(filePath) === DEFAULT_MAP_FLOOR)
+    ?? entries[0]
+    ?? null;
 }
 
 function getVectorLabel(fileName) {
@@ -167,7 +185,7 @@ function normalizeMapVector(entryPath, data) {
         x: Number(poi?.x),
         y: Number(poi?.y),
         id: String(poi?.id ?? "").trim(),
-        title: poi?.title ? String(poi.title) : "",
+        title: poi?.title ? formatPoiDisplayLabel(String(poi.title)) : "",
         type: poi?.type ? String(poi.type) : "other",
       }))
       .filter((poi) => poi.id && Number.isFinite(poi.x) && Number.isFinite(poi.y))
@@ -185,13 +203,17 @@ function normalizeMapVector(entryPath, data) {
 }
 
 async function loadMapVectors() {
-  const entries = Object.entries(localMapVectorModules).sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"));
+  const entries = Object.entries(localMapVectorModules)
+    .sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"))
+    .filter(([entryPath]) => isActiveMapAssetPath(entryPath));
   return entries.map(([entryPath, data]) => normalizeMapVector(entryPath, data));
 }
 
 async function loadMapVector() {
   const vectors = await loadMapVectors();
-  return vectors[0] ?? null;
+  return vectors.find((vector) => getFloorFromMapId(vector.id) === DEFAULT_MAP_FLOOR)
+    ?? vectors[0]
+    ?? null;
 }
 
 function normalizeMapGraph(entryPath, data) {
@@ -200,13 +222,20 @@ function normalizeMapGraph(entryPath, data) {
     ...data,
     id: fileName,
     label: data?.label ?? getGraphLabel(fileName),
-    nodes: Array.isArray(data?.nodes) ? data.nodes : [],
+    nodes: Array.isArray(data?.nodes)
+      ? data.nodes.map((node) => ({
+        ...node,
+        label: node?.label ? formatPoiDisplayLabel(String(node.label)) : "",
+      }))
+      : [],
     edges: Array.isArray(data?.edges) ? data.edges : [],
   };
 }
 
 async function loadMapGraphs() {
-  const entries = Object.entries(localMapGraphModules).sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"));
+  const entries = Object.entries(localMapGraphModules)
+    .sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath, "ru"))
+    .filter(([entryPath]) => isActiveMapAssetPath(entryPath));
   return entries.map(([entryPath, data]) => normalizeMapGraph(entryPath, data));
 }
 
@@ -243,6 +272,47 @@ function registerFloor(floorsMap, building, floor, placesDelta = 0) {
   floorsMap.get(key).placesTotal += placesDelta;
 }
 
+const LATIN_AUDITORIUM_SUFFIX = {
+  a: "\u0430",
+  b: "\u0431",
+  v: "\u0432",
+  g: "\u0433",
+  u: "\u044E",
+};
+
+export function localizeAuditoriumRoomSuffix(text) {
+  return String(text ?? "").replace(/(\d)([abvgu])/gi, (match, digits, letter) => {
+    const mapped = LATIN_AUDITORIUM_SUFFIX[letter.toLowerCase()];
+    return mapped ? `${digits}${mapped}` : match;
+  });
+}
+
+export function formatPoiDisplayLabel(label) {
+  const text = String(label ?? "").trim();
+  if (!text) {
+    return text;
+  }
+
+  const auditoriumMatch = text.match(/^Ауд\.\s+(.+)$/u);
+  if (auditoriumMatch) {
+    return localizeAuditoriumRoomSuffix(auditoriumMatch[1].trim());
+  }
+
+  if (/^лестница/i.test(text)) {
+    return "лестница";
+  }
+
+  if (/^принтер/i.test(text)) {
+    return "принтер";
+  }
+
+  if (/^туалет/i.test(text)) {
+    return "туалет";
+  }
+
+  return localizeAuditoriumRoomSuffix(text);
+}
+
 export async function getAvailableFloors() {
   const [places, vectors] = await Promise.all([getAllPlaces(), getMapVectors()]);
   const floorsMap = new Map();
@@ -259,7 +329,9 @@ export async function getAvailableFloors() {
     registerFloor(floorsMap, normalizeBuilding("1"), floorNumber, 0);
   });
 
-  return Array.from(floorsMap.values()).sort(compareFloors);
+  return Array.from(floorsMap.values())
+    .filter((floor) => isActiveMapFloor(floor.floor))
+    .sort(compareFloors);
 }
 
 export async function getMapImage() {
@@ -294,7 +366,13 @@ export async function getMapGraphs() {
   return cachedMapGraphsPromise;
 }
 
-export async function getFloorLinks() {
+export async function getFloorLinks(mapGraphs) {
+  const graphs = mapGraphs ?? (await getMapGraphs());
+  const autoConnections = buildFloorLinksFromGraphs(graphs, [2, 3]);
+  if (autoConnections.length > 0) {
+    return autoConnections;
+  }
+
   const entries = Object.values(localFloorLinksModule);
   const data = entries[0];
   return Array.isArray(data?.connections) ? data.connections : [];
@@ -352,3 +430,162 @@ export async function buildRoute({ fromPlaceId, toPlaceId, accessibleOnly = fals
 export async function getRoomSchedule(roomId, date) {
   return fetchJson(`/rooms/${encodeURIComponent(roomId)}/schedule`, { date });
 }
+
+const CYRILLIC_TO_LATIN = {
+  "\u0430": "a",
+  "\u0431": "b",
+  "\u0432": "v",
+  "\u0433": "g",
+  "\u0434": "d",
+  "\u0435": "e",
+};
+
+export function normalizeRoomCode(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[\u0430-\u044f\u0451]/g, (ch) => CYRILLIC_TO_LATIN[ch] ?? ch)
+    .replace(/\//g, "_")
+    .replace(/[^a-z0-9._]/g, "");
+}
+
+export function extractMapRoomToken(mapObjectId) {
+  const normalized = String(mapObjectId ?? "").trim().toLowerCase();
+  const match = normalized.match(/^room-(.+)$/i);
+  return match?.[1] ?? "";
+}
+
+export function buildMapRoomId(roomToken) {
+  const normalized = normalizeRoomCode(roomToken);
+  return normalized ? `room-${normalized}` : "";
+}
+
+export function findClassroomByRoomCode(classrooms, roomToken) {
+  const targetCode = normalizeRoomCode(roomToken);
+  if (!targetCode) {
+    return null;
+  }
+
+  return (classrooms ?? []).find((place) => {
+    if (place.type !== "classroom") {
+      return false;
+    }
+
+    const idToken = place.id?.startsWith("place_") ? place.id.slice("place_".length) : "";
+    if (idToken && normalizeRoomCode(idToken) === targetCode) {
+      return true;
+    }
+
+    const nameMatch = String(place.name ?? "").match(/(\d+[\u0430-\u044f\u0451a-z0-9./_]*)/iu);
+    return Boolean(nameMatch && normalizeRoomCode(nameMatch[1]) === targetCode);
+  }) ?? null;
+}
+
+export function buildClassroomPlacesFromMapPois(mapVector, floorMeta) {
+  if (!mapVector || !floorMeta) {
+    return [];
+  }
+
+  const building = floorMeta.building ?? "B1";
+  const floor = floorMeta.floor;
+  const seen = new Set();
+
+  return (mapVector.pois ?? [])
+    .map((poi) => {
+      if (poi.type !== "room" && !/^room-/i.test(poi.id)) {
+        return null;
+      }
+
+      const roomToken = extractMapRoomToken(poi.id)
+        || normalizeRoomCode(String(poi.title ?? "").replace(/^Ауд\.\s*/iu, ""));
+      if (!roomToken || seen.has(roomToken)) {
+        return null;
+      }
+      seen.add(roomToken);
+
+      const displayLabel = String(poi.title ?? "").trim();
+      const roomLabel = roomToken.replace(/_/g, "/");
+
+      return {
+        id: `place_${roomToken}`,
+        name: displayLabel || `Аудитория ${roomLabel}`,
+        type: "classroom",
+        description: "Учебная аудитория",
+        coordinates: {
+          building,
+          floor,
+          x: Number(poi.x) || 0,
+          y: Number(poi.y) || 0,
+        },
+        tags: ["lecture"],
+        isAccessible: true,
+      };
+    })
+    .filter(Boolean);
+}
+
+export function createSyntheticClassroomPlace(placeId, floorMeta) {
+  if (!placeId?.startsWith("place_") || !floorMeta) {
+    return null;
+  }
+
+  const token = placeId.slice("place_".length);
+  if (!token) {
+    return null;
+  }
+
+  return {
+    id: placeId,
+    name: `Аудитория ${token.replace(/_/g, "/")}`,
+    type: "classroom",
+    description: "Учебная аудитория",
+    coordinates: {
+      building: floorMeta.building ?? "B1",
+      floor: floorMeta.floor,
+      x: 0,
+      y: 0,
+    },
+    tags: ["lecture"],
+    isAccessible: true,
+  };
+}
+
+export function mapObjectExistsOnVector(mapVector, objectId) {
+  if (!mapVector || !objectId) {
+    return false;
+  }
+
+  return (mapVector.pois ?? []).some((poi) => poi.id === objectId)
+    || (mapVector.elements ?? []).some((element) => element.id === objectId);
+}
+
+export function getLandscapeMapAspectRatio(mapWidth, mapHeight) {
+  const width = Number(mapWidth) > 0 ? Number(mapWidth) : 1600;
+  const height = Number(mapHeight) > 0 ? Number(mapHeight) : 1080;
+
+  if (width >= height) {
+    return `${width} / ${height}`;
+  }
+
+  return `${height} / ${width}`;
+}
+
+export function getMobileLandscapeMapFrameSx(mapWidth, mapHeight) {
+  return {
+    width: "100%",
+    aspectRatio: getLandscapeMapAspectRatio(mapWidth, mapHeight),
+    maxHeight: "min(280px, 68vw)",
+    minHeight: 0,
+    mx: "auto",
+    position: "relative",
+    overflow: "hidden",
+    "@media (orientation: landscape)": {
+      maxHeight: "min(360px, 72vh)",
+    },
+  };
+}
+
+export const FULLSCREEN_ROTATED_CAMERA_FIT = 0.72;
+export const FULLSCREEN_MAP_SCALE = 2;
+export const FULLSCREEN_FRAME_ROTATION_DEG = 180;
+export const FULLSCREEN_MOBILE_VIEW_ROTATION_Z = Math.PI / 2;
+export const FULLSCREEN_VIEW_ROTATION_Z = -Math.PI / 2;

@@ -1,7 +1,7 @@
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 
-function FloorChipSlider({ items, selectedKey, onSelect, dark = false }) {
+function FloorChipSlider({ items, selectedKey, onSelect, dark = false, orientation = "horizontal" }) {
   if (!items.length) {
     return null;
   }
@@ -27,16 +27,20 @@ function FloorChipSlider({ items, selectedKey, onSelect, dark = false }) {
         fontWeight: 600,
       };
 
+  const vertical = orientation === "vertical";
+
   return (
     <Box
       role="tablist"
       aria-label="Выбор этажа"
       sx={{
         display: "flex",
+        flexDirection: vertical ? "column" : "row",
         gap: 1,
-        overflowX: "auto",
-        pb: 0.5,
-        scrollSnapType: "x mandatory",
+        overflowX: vertical ? "visible" : "auto",
+        overflowY: vertical ? "auto" : "visible",
+        pb: vertical ? 0 : 0.5,
+        scrollSnapType: vertical ? "y mandatory" : "x mandatory",
         WebkitOverflowScrolling: "touch",
         scrollbarWidth: "none",
         msOverflowStyle: "none",

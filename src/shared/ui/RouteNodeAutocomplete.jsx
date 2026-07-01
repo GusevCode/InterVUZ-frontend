@@ -1,8 +1,9 @@
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
+import { formatPoiDisplayLabel } from "../../entities/map/mapLib";
 
 export function getRouteNodeLabel(node) {
-  return String(node?.label ?? node?.title ?? node?.id ?? "").trim();
+  return formatPoiDisplayLabel(String(node?.label ?? node?.title ?? node?.id ?? "").trim());
 }
 
 function filterRouteNodes(nodes, inputValue) {

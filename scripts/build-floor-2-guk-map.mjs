@@ -3,9 +3,48 @@ import path from "node:path";
 import { XMLParser } from "fast-xml-parser";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const SOURCE_SVG = path.join(ROOT, "src/entities/map/assets/floor_2.svg");
-const OUTPUT_MAP_PATH = path.join(ROOT, "src/entities/map/assets/floor_2.map.json");
-const OUTPUT_GRAPH_PATH = path.join(ROOT, "src/entities/map/assets/floor_2.graph.json");
+const ASSETS_DIR = path.join(ROOT, "src/entities/map/assets");
+
+const FLOOR_CONFIGS = {
+  2: {
+    hiddenGroupClasses: ["st15"],
+    layers: {
+      background: "st12",
+      wallFill: "st9",
+      wallOutline: "st4",
+      details: "st5",
+    },
+    sourceLabel: "guk-2.svg (\u0413\u0423\u041a, 2 \u044d\u0442\u0430\u0436)",
+  },
+  3: {
+    hiddenGroupClasses: ["cls-13"],
+    layers: {
+      background: "cls-11",
+      wallFill: "cls-14",
+      wallOutline: "cls-5",
+      details: "cls-9",
+      corridor: "cls-3",
+    },
+    sourceLabel: "gz_3.svg (\u0413\u0423\u041a, 3 \u044d\u0442\u0430\u0436)",
+  },
+};
+
+function resolveFloorNumber() {
+  const arg = process.argv.find((value) => value.startsWith("--floor="));
+  const parsed = Number(arg?.split("=")[1] ?? process.argv[2] ?? 2);
+  if (!FLOOR_CONFIGS[parsed]) {
+    throw new Error(`Unsupported floor: ${parsed}. Available: ${Object.keys(FLOOR_CONFIGS).join(", ")}`);
+  }
+  return parsed;
+}
+
+function getFloorPaths(floorNumber) {
+  return {
+    sourceSvg: path.join(ASSETS_DIR, `floor_${floorNumber}.svg`),
+    outputMapPath: path.join(ASSETS_DIR, `floor_${floorNumber}.map.json`),
+    outputGraphPath: path.join(ASSETS_DIR, `floor_${floorNumber}.graph.json`),
+  };
+}
 
 // Adobe Illustrator escapes characters that are unsafe in SVG ids as literal
 // "_xHH_" sequences (hex code of the character). Decode them back.
@@ -360,25 +399,32 @@ function nearestNode(nodes, x, y) {
   return best;
 }
 
+function collectLines(nodesList, collected = []) {
+  (nodesList ?? []).forEach((node) => {
+    const tag = tagOf(node);
+    if (!tag || tag === "#text") {
+      return;
+    }
+    if (tag === "line") {
+      collected.push(readAttributes(node));
+      return;
+    }
+    collectLines(childrenOf(node, tag), collected);
+  });
+  return collected;
+}
+
 function buildGraphEdges(edgesLayer, nodes) {
   const tag = tagOf(edgesLayer);
-  const groups = childrenOf(edgesLayer, tag);
+  const lines = collectLines(childrenOf(edgesLayer, tag));
   const edges = [];
   const seenKeys = new Set();
 
-  groups.forEach((group) => {
-    const groupTag = tagOf(group);
-    if (groupTag !== "g") {
-      return;
-    }
-    const line = findFirstDescendant(childrenOf(group, groupTag), "line");
-    if (!line) {
-      return;
-    }
-    const x1 = parseNumber(line.attrs.x1);
-    const y1 = parseNumber(line.attrs.y1);
-    const x2 = parseNumber(line.attrs.x2);
-    const y2 = parseNumber(line.attrs.y2);
+  lines.forEach((line) => {
+    const x1 = parseNumber(line.x1);
+    const y1 = parseNumber(line.y1);
+    const x2 = parseNumber(line.x2);
+    const y2 = parseNumber(line.y2);
     if (![x1, y1, x2, y2].every(Number.isFinite)) {
       return;
     }
@@ -407,8 +453,35 @@ function buildGraphEdges(edgesLayer, nodes) {
   return edges;
 }
 
-function findLayerById(svgChildren, id) {
-  return findChildByAttr(svgChildren, (tag, attrs) => tag === "g" && attrs.id === id);
+function findLayerById(nodes, id) {
+  for (const node of nodes ?? []) {
+    const tag = tagOf(node);
+    if (!tag || tag === "#text") {
+      continue;
+    }
+    const attrs = readAttributes(node);
+    if (tag === "g" && attrs.id === id) {
+      return node;
+    }
+    const nested = findLayerById(childrenOf(node, tag), id);
+    if (nested) {
+      return nested;
+    }
+  }
+  return null;
+}
+
+function getMapGroups(svgChildren) {
+  const groups = (svgChildren ?? []).filter((node) => tagOf(node) === "g");
+  if (groups.length === 1 && !readAttributes(groups[0]).id) {
+    return childrenOf(groups[0], "g").filter((node) => tagOf(node) === "g");
+  }
+  return groups;
+}
+
+function isHiddenGroup(attrs, hiddenGroupClasses) {
+  const groupClasses = String(attrs.class ?? "").split(/\s+/);
+  return hiddenGroupClasses.some((hiddenClass) => groupClasses.includes(hiddenClass));
 }
 
 const SHAPE_TAGS = new Set(["path", "rect", "line", "polygon", "polyline", "circle", "ellipse"]);
@@ -433,10 +506,10 @@ function findFirstShapeClass(nodes) {
   return "";
 }
 
-function classifyTopLevelLayers(svgChildren) {
+function classifyTopLevelLayers(svgChildren, hiddenGroupClasses) {
   const layersByClass = {};
 
-  svgChildren.forEach((node) => {
+  getMapGroups(svgChildren).forEach((node) => {
     const tag = tagOf(node);
     if (tag !== "g") {
       return;
@@ -445,7 +518,7 @@ function classifyTopLevelLayers(svgChildren) {
     if (attrs.id === "nodes" || attrs.id === "edges") {
       return;
     }
-    if (String(attrs.class ?? "").split(/\s+/).includes("st15")) {
+    if (isHiddenGroup(attrs, hiddenGroupClasses)) {
       return;
     }
 
@@ -459,7 +532,10 @@ function classifyTopLevelLayers(svgChildren) {
 }
 
 function main() {
-  const svgContent = fs.readFileSync(SOURCE_SVG, "utf8");
+  const floorNumber = resolveFloorNumber();
+  const floorConfig = FLOOR_CONFIGS[floorNumber];
+  const { sourceSvg, outputMapPath, outputGraphPath } = getFloorPaths(floorNumber);
+  const svgContent = fs.readFileSync(sourceSvg, "utf8");
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
@@ -478,11 +554,13 @@ function main() {
     .map(Number);
   const [, , width, height] = viewBoxParts;
 
-  const layersByClass = classifyTopLevelLayers(svgChildren);
-  const background = layersByClass.st12 ?? null;
-  const wallFill = layersByClass.st9 ?? null;
-  const wallOutline = layersByClass.st4 ?? null;
-  const details = layersByClass.st5 ?? null;
+  const layersByClass = classifyTopLevelLayers(svgChildren, floorConfig.hiddenGroupClasses);
+  const { background: backgroundClass, wallFill: wallFillClass, wallOutline: wallOutlineClass, details: detailsClass, corridor: corridorClass } = floorConfig.layers;
+  const background = layersByClass[backgroundClass] ?? null;
+  const wallFill = layersByClass[wallFillClass] ?? null;
+  const wallOutline = layersByClass[wallOutlineClass] ?? null;
+  const details = layersByClass[detailsClass] ?? null;
+  const corridor = corridorClass ? (layersByClass[corridorClass] ?? null) : null;
   const nodesLayer = findLayerById(svgChildren, "nodes");
   const edgesLayer = findLayerById(svgChildren, "edges");
 
@@ -490,7 +568,7 @@ function main() {
     throw new Error("nodes/edges layers not found in source SVG.");
   }
   if (!background || !wallFill || !wallOutline || !details) {
-    throw new Error("Expected visual layers (st12/st9/st4/st5) not found in source SVG.");
+    throw new Error(`Expected visual layers not found in source SVG for floor ${floorNumber}.`);
   }
 
   const elements = [
@@ -514,6 +592,12 @@ function main() {
       idPrefix: "wall-detail",
       stroke: "#4d4d4d",
       strokeWidth: 0.75,
+      kind: "wall",
+    }) : []),
+    ...(corridor ? buildElementsFromLayer(corridor, {
+      idPrefix: "wall-corridor",
+      stroke: "#88d4ff",
+      strokeWidth: 2,
       kind: "wall",
     }) : []),
   ];
@@ -545,7 +629,7 @@ function main() {
     elements,
     pois,
     meta: {
-      source: "guk-2.svg (\u0413\u0423\u041a, 2 \u044d\u0442\u0430\u0436)",
+      source: floorConfig.sourceLabel,
       generatedAt: new Date().toISOString(),
       elementCount: elements.length,
     },
@@ -556,20 +640,20 @@ function main() {
     nodes: graphNodes.map(({ finalId, x, y, label }) => ({ id: finalId, x, y, label })),
     edges: graphEdges,
     meta: {
-      source: "guk-2.svg (\u0413\u0423\u041a, 2 \u044d\u0442\u0430\u0436)",
+      source: floorConfig.sourceLabel,
       generatedAt: new Date().toISOString(),
       nodeCount: graphNodes.length,
       edgeCount: graphEdges.length,
     },
   };
 
-  fs.writeFileSync(OUTPUT_MAP_PATH, `${JSON.stringify(mapOutput, null, 2)}\n`, "utf8");
-  fs.writeFileSync(OUTPUT_GRAPH_PATH, `${JSON.stringify(graphOutput, null, 2)}\n`, "utf8");
+  fs.writeFileSync(outputMapPath, `${JSON.stringify(mapOutput, null, 2)}\n`, "utf8");
+  fs.writeFileSync(outputGraphPath, `${JSON.stringify(graphOutput, null, 2)}\n`, "utf8");
 
-  console.log(`Saved floor map: ${elements.length} elements to ${path.relative(ROOT, OUTPUT_MAP_PATH)}`);
+  console.log(`Saved floor ${floorNumber} map: ${elements.length} elements to ${path.relative(ROOT, outputMapPath)}`);
   console.log(
-    `Saved route graph: ${graphNodes.length} nodes, ${graphEdges.length} edges to `
-    + `${path.relative(ROOT, OUTPUT_GRAPH_PATH)}`,
+    `Saved floor ${floorNumber} route graph: ${graphNodes.length} nodes, ${graphEdges.length} edges to `
+    + `${path.relative(ROOT, outputGraphPath)}`,
   );
 }
 
